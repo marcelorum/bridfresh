@@ -1,0 +1,17 @@
+# macOS
+.DS_Store
+
+# Logs (future daemon mode)
+*.log
+~/Library/Logs/
+
+# Local editor config
+.vscode/
+.idea/
+
+# Keepalive local state — URLs are personal, don't commit real session targets
+# Uncomment to keep your real urls.txt private:
+# keepalive/urls.txt
+
+# Local tooling (keep out of repo)
+.atl/
