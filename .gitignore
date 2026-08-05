@@ -10,8 +10,9 @@
 .idea/
 
 # Keepalive local state — URLs are personal, don't commit real session targets
-# Uncomment to keep your real urls.txt private:
-# keepalive/urls.txt
+keepalive/config.conf
+keepalive/urls.txt
+# (keepalive/config.example.conf and keepalive/urls.example.txt ARE committed as templates)
 
 # Local tooling (keep out of repo)
 .atl/

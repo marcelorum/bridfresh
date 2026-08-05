@@ -1,5 +1,0 @@
-# Una URL por linea, cicla en este orden
-https://tu-web.com/dashboard
-https://tu-web.com/lista
-https://tu-web.com/perfil
-# Las lineas con # se ignoran (como esta)
