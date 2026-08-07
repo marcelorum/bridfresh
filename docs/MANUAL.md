@@ -1,274 +1,245 @@
-# Session Keep-Alive — Usage Manual
+# keepdash — Usage Manual
 
-The complete reference for `keepalive.sh`, a macOS-native script that keeps a web session alive by rotating URLs in the real browser tab where you are already logged in.
+The complete reference for `keepdash.sh`: a dedicated, invisible Chrome-based
+dashboard that keeps your session alive by rotating URLS on a schedule.
 
 ## Contents
 
 1. [Requirements](#requirements)
-2. [Getting started](#getting-started)
-3. [Command-line flags](#command-line-flags)
-4. [Examples with expected output](#examples-with-expected-output)
-5. [URL sources and priority](#url-sources-and-priority)
-6. [Configuration reference](#configuration-reference)
+2. [How it works](#how-it-works)
+3. [First time: login once](#first-time-login-once)
+4. [Daily use: the invisible cycle](#daily-use-the-invisible-cycle)
+5. [Command-line flags](#command-line-flags)
+6. [Examples](#examples)
 7. [URL file format](#url-file-format)
-8. [How browser automation works](#how-browser-automation-works)
-9. [Troubleshooting](#troubleshooting)
-10. [FAQ](#faq)
+8. [Configuration reference](#configuration-reference)
+9. [Session expiration](#session-expiration)
+10. [Troubleshooting](#troubleshooting)
+11. [FAQ](#faq)
 
 ## Requirements
 
-- macOS only (uses `osascript`). The script exits with an error on any other OS.
-- bash 3.2 (the default on macOS).
-- One or more of: Google Chrome, Safari, Firefox.
-- No external dependencies and nothing to install.
+- macOS with Google Chrome installed (default path:
+  `/Applications/Google Chrome.app`).
+- bash (the one shipped on macOS).
+- `curl` (preinstalled).
+- No other dependencies, nothing to install.
 
-## Getting started
+## How it works
 
-1. **Edit `config.conf`** with your real URLs. The shipped file contains placeholders (`tu-web.com/...`) and the script refuses to start with an empty URL list.
-2. **Run the script** from the `keepalive/` directory:
+`keepdash.sh` launches **its own copy of Chrome** with:
 
-   ```bash
-   cd keepalive
-   ./keepalive.sh
-   ```
+- a **dedicated profile** (`<repo>/.dash-profile/`) — separate from your personal
+  and work profiles, so it never touches your existing sessions;
+- the Chrome DevTools Protocol listening on local port `9222`.
 
-3. **Verify**: the terminal prints the rotation list, then a `[HH:MM:SS] -> URL` line each time the tab navigates. Press `Ctrl+C` to stop.
+The script controls that instance over HTTP with plain `curl`:
+open a URL, close tabs, list open targets. It rotates between your URLs every
+`INTERVAL` seconds so the server sees an active user.
 
-The script requires no installation: `config.conf` is loaded automatically from the same directory as the script, so run it from `keepalive/` (or any directory — the script resolves its own config path).
+The cycle runs in **`--headless=new`** mode. Chrome is invisible and never grabs
+focus, so it cannot interrupt your typing or steal the window.
+
+### Why a dedicated dashboard instead of your real browser
+
+The previous script (`legacy/keepalive.sh`) navigated your real browser tab and
+could bring Chrome to the front. This version replaces that: it uses its own
+dedicated instance, so your browsing is untouched and the loop is truly invisible.
+The legacy script is kept in `legacy/` only for reference — **do not use it**.
+
+## First time: login once
+
+You authenticate **one time**, in a visible window:
+
+```bash
+./keepdash.sh --login
+```
+
+1. A Chrome window opens on your first URL.
+2. Log in normally (SSO + 2FA).
+3. Close the window (or leave it) and run the daily command below.
+
+Your session is saved into `.dash-profile/` (cookies). It is reused by the
+headless cycle from then on. Shutting Chrome down or stopping the dashboard
+**does not** log you out.
+
+You only ever need `--login` again when the session expires.
+
+## Daily use — the invisible cycle
+
+```bash
+./keepdash.sh
+```
+
+Starts the dedicated dashboard headless and cycles through your URLs every
+`interval` seconds (default 120 s). The terminal shows a timestamp and which
+dashboard was refreshed:
+
+```text
+Navegador-dashboard invisible arriba.
+Alternando invisible. Ciclo: 120s, 3 URL(s).
+Para detener:      ./keepdash.sh --stop
+Para ver/login:     ./keepdash.sh --login
+---
+[16:45:00]
+   refresca > https://tu-web.com/dashboard
+```
+
+Stop it with `Ctrl+C` (prints `Detenido.` and shuts down headless cleanly) or
+`./keepdash.sh --stop`.
 
 ## Command-line flags
 
 | Flag | Argument | Effect |
 |------|----------|--------|
-| `-c` | — | Use Google Chrome |
-| `-f` | — | Use Firefox |
-| `-s` | — | Use Safari |
-| `-t` | `<sec>` | Interval between rotations, in seconds. Overrides `INTERVAL` from `config.conf` |
-| `-u` | `<file>` | Read URLs from a text file, one per line. Overrides `URLS` from `config.conf` |
-| `-h` | — | Print the help text and exit |
-| `--list` | — | Print the current state (URLs, interval, browsers) and exit without cycling |
-| `--once` | `<index>` | Navigate the URL at that index once and exit. For testing |
+| `-h` / `--help` | — | Print the help text and exit |
+| `-t` | `<sec>` | Interval between refreshes, in seconds (default: `config.conf`) |
+| `-u` | `<file>` | Read URLs from a file, one per line |
+| `--login` | — | Open a **visible** window to authenticate (or to view) |
+| `--once` | — | One refresh, then exit (for testing) |
+| `--stop` | — | Shut down the dedicated dashboard |
+| `--show` | — | Open a **visible** window to view the dashboard |
 
-`--list` and `--once` can appear anywhere in the command line, before or after other flags.
+### Flag semantics
 
-### Browser flag semantics
+- `--login` and `--show` both start the dashboard with a visible window.
+  `--login` is for authenticating; `--show` is to look at it. Either way, return
+  to the headless cycle afterwards with `./keepdash.sh`.
+- `--once` does a single headless refresh of the **first** URL and exits. Good
+  for verifying the setup.
+- `-t <sec>` overrides the interval. Any positive value works; match it to the
+  portal's actual inactivity timeout.
+- `-u <file>` must point to an existing file, or the script exits with an error.
 
-- If **any** of `-c`, `-f`, `-s` is passed, only those browsers are used and the browser settings in `config.conf` are ignored.
-- If **none** are passed, the `CHROME` / `SAFARI` / `FIREFOX` values in `config.conf` apply.
-- Passing multiple browser flags is valid: the URL is navigated in each selected browser. Example: `-c -f` rotates in Chrome and Firefox.
-
-### Interval flag semantics
-
-`-t <sec>` accepts any positive number of seconds. `INTERVAL` from `config.conf` is used only when `-t` is absent. There is no minimum enforced — use common sense so the traffic looks natural.
-
-## Examples with expected output
-
-### Default run (config.conf)
+## Example uses
 
 ```bash
-./keepalive.sh
+./keepdash.sh               # headless, 120s default
+./keepdash.sh -t 300        # refresh every 5 minutes
+./keepdash.sh -u myurls.txt # URLs from a specific file
+./keepdash.sh --once        # one refresh to test
+./keepdash.sh --show        # open the dashboard to look at it
+./keepdash.sh --stop        # shut the dashboard down
+./keepdash.sh --login       # authenticate (SSO + 2FA)
 ```
-
-Startup output:
-
-```text
-URLs en rotacion:
-  [0] https://tu-web.com/dashboard
-  [1] https://tu-web.com/lista
-  [2] https://tu-web.com/perfil
-Intervalo: 120s
-Browsers: Chrome=true Safari=true Firefox=true
----
-[12:00:00] -> https://tu-web.com/dashboard
-[12:02:00] -> https://tu-web.com/lista
-```
-
-The loop rotates through the configured URLs forever, waiting `INTERVAL` seconds between each. `Ctrl+C` prints `Detenido.` and exits.
-
-### Chrome + Firefox, 5-minute interval, URLs from file
-
-```bash
-./keepalive.sh -c -f -t 300 urls.txt
-```
-
-Rotates through the URLs in `urls.txt` every 5 minutes, in both Chrome and Firefox. The startup output shows `Browsers: Chrome=true Safari=false Firefox=true`.
-
-### Safari only, single URL
-
-```bash
-./keepalive.sh -s https://example.com/a
-```
-
-Rotates that single URL in Safari every `INTERVAL` seconds (from config, since `-t` is absent). A single-URL rotation re-navigates the same page repeatedly, which still counts as activity. The startup output appends `(URL directa: usa solo esa)`.
-
-### Chrome, URL file, 2-minute interval
-
-```bash
-./keepalive.sh -c -u urls.txt -t 120
-```
-
-Reads `urls.txt`, cycles every 2 minutes, Chrome only.
-
-### Show current state without cycling
-
-```bash
-./keepalive.sh --list
-```
-
-```text
-URLs en rotacion:
-  [0] https://tu-web.com/dashboard
-  [1] https://tu-web.com/lista
-  [2] https://tu-web.com/perfil
-Intervalo: 120s
-Browsers: Chrome=true Safari=true Firefox=true
-```
-
-Exits immediately. Useful to confirm what the script would do before starting the loop.
-
-### One-shot navigation (testing)
-
-```bash
-./keepalive.sh --once 2
-```
-
-```text
-Navegando [2] -> https://tu-web.com/perfil
-```
-
-Navigates the URL at index 2 in all enabled browsers once, then exits. Useful for verifying a browser integration without starting the loop.
-
-### Stopping the loop
-
-Press `Ctrl+C` in the terminal running the script. The loop stops and prints `Detenido.`.
-
-## URL sources and priority
-
-URLs can come from three places. When more than one is present, the first in this list wins:
-
-| Priority | Source | How |
-|----------|--------|-----|
-| 1 | `-u <file>` | Text file, one URL per line |
-| 2 | Positional argument | URL passed as the last argument |
-| 3 | `config.conf` | `URLS=(...)` array |
-
-If the result is an empty URL list, the script exits with an error:
-
-```text
-ERROR: no hay URLs. Usa config.conf, -u <archivo> o una URL al final.
-```
-
-## Configuration reference
-
-`config.conf` sits next to the script in `keepalive/` and is sourced as a bash file.
-
-| Setting | Default | Values | Meaning |
-|---------|---------|--------|---------|
-| `URLS` | placeholders | array of strings | Pages to rotate through, in order |
-| `INTERVAL` | `120` | seconds | Time between rotations. `120` = 2 min, `300` = 5 min |
-| `CHROME` | `true` | `true` / `false` | Control Google Chrome |
-| `SAFARI` | `true` | `true` / `false` | Control Safari |
-| `FIREFOX` | `true` | `true` / `false` | Control Firefox |
-| `RELOAD_MODE` | `"navigate"` | `"navigate"` / `"force"` | `"force"` also reloads the page after navigating |
-
-### RELOAD_MODE details
-
-- `"navigate"` (default): navigate to the URL only.
-- `"force"`: navigate to the URL, then reload the tab. Produces a more visible "load" on screen.
-- Applies to Chrome and Safari. Firefox always navigates via keystrokes and does not reload.
-
-Placeholders in the shipped file use `tu-web.com` — replace them with real URLs. Comments with `#` are allowed throughout the file.
 
 ## URL file format
 
-The file passed to `-u <file>` is plain text:
+The file passed to `-u <file>`, or the default `urls.txt`, is plain text:
 
 - One URL per line, cycled in file order.
 - Empty lines are ignored.
 - Lines starting with `#` are ignored.
-- Inline comments: everything after a `#` on a line is ignored.
+- Everything after a `#` on a line is ignored (inline comments).
 - Whitespace around each line is trimmed.
 
 Example (`urls.txt`):
 
 ```text
-# Una URL por linea, cicla en este orden
+# one URL per line, cycled in this order
 https://tu-web.com/dashboard
 https://tu-web.com/lista
 https://tu-web.com/perfil
-# Las lineas con # se ignoran (como esta)
 ```
 
-Passing a nonexistent file exits with an error:
+The script picks **`urls.txt` next to it automatically** if present, so you run
+`./keepdash.sh` with no `-u` and it still uses your real URLs. If you pass `-u`,
+that file wins. If the file does not exist, the script exits with an error.
 
-```text
-ERROR: archivo 'nope.txt' no existe
+## Configuration reference
+
+`config.conf` sits in the repository root, next to the script, and is read
+automatically — it is **private and gitignored**. Copy the template to create it:
+
+```bash
+cp config.example.conf config.conf
 ```
 
-## How browser automation works
+Today the script reads **`INTERVAL`** from it as the default interval:
 
-The script drives the real browser process and its existing logged-in session. It never sends headless requests.
+| Setting | Default | Values | Meaning |
+|---------|---------|--------|---------|
+| `INTERVAL` | `120` | seconds | Time between refreshes, in seconds |
 
-| Aspect | Chrome | Safari | Firefox |
-|--------|--------|--------|---------|
-| Automation method | AppleScript: `set URL of active tab of front window` | AppleScript: `set URL of current tab of front window` | Keystroke simulation: `Cmd+L`, type URL, Enter |
-| Session reuse | Yes — existing tab, existing login | Yes — existing tab, existing login | Yes — existing tab, existing login |
-| Brings window to front | No, when already running | No, when already running | Yes, always |
-| First launch behavior | Opens the app and brings it to front | Opens the app and brings it to front | Opens the app and brings it to front |
-| `RELOAD_MODE="force"` | Reloads the tab after navigating | Runs `location.reload()` via JavaScript | Not supported |
+Other keys in `config.example.conf` are carried over from the legacy script and
+are not used by `keepdash.sh` yet. Keep the file if you want to set a default
+interval; the `-t` flag overrides it.
 
-Chrome and Safari allow true background navigation: the script updates the tab's URL without activating the window, so you can keep working while the session stays alive. Firefox has no AppleScript URL control, so the script simulates the human shortcut (`Cmd+L`, paste, `Enter`), which necessarily brings Firefox to the front.
+## Session state
+
+The SSO session lives in `.dash-profile/` (gitignored, private). Because the
+headless cycle reuses the profile's cookies, you log in once and the session
+survives Chrome restarts and `--stop`/`--start` cycles. Deleting `.dash-profile/`
+logs you out — you would need to re-authenticate with `--login`.
 
 ## Troubleshooting
 
-### Firefox comes to the front on every rotation
+### The dashboard asks to log in again
 
-Expected. Firefox does not expose tab URLs to AppleScript, so the script simulates keystrokes, which requires the app to be active. If background navigation matters to you, use Chrome or Safari for the keep-alive browser and leave Firefox alone.
+The cycle checks for a `login`/`okta` page in two points — before each refresh
+and right after it. If it finds one, it stops the dashboard and tells you:
 
-### A browser jumps to the front when the script starts
+```text
+La session expiro. Corre  ./keepdash.sh --login  para autenticar de nuevo.
+```
 
-The browser was not running, so the first navigation launched it. Keep the browsers running in the background before starting the script; Chrome and Safari then navigate without stealing focus.
+Run `./keepdash.sh --login`, log in again, then restart `./keepdash.sh`.
 
-### The session still expires
+### Nothing happens / it exits saying the dashboard asks for auth
 
-Check, in order:
+On a fresh profile the headless mode may land on a login page, with no visible
+window, and ask you to authenticate. Run `./keepdash.sh --login` once, then
+`./keepdash.sh`.
 
-1. **Interval too long.** If the portal logs out after, say, 10 minutes of inactivity, an `INTERVAL` of 300 seconds (5 min) is comfortable; 120 seconds (2 min) is safest but may be overkill.
-2. **The portal needs real interaction.** Some portals require actual mouse/keyboard input, not just navigation. Simulated mouse movement is a planned feature (see `FUTURE_FEATURES.md`), not yet implemented.
-3. **The wrong browser is being controlled.** Confirm the startup output lists the browsers you expect: `Browsers: Chrome=... Safari=... Firefox=...`. If you passed a browser flag, only those browsers are used.
+### The cycle feels too busy or too slow
 
-### The script prints a URL error
+Tune the interval. If your session expires after ~5 minutes, `-t 300` (or
+`INTERVAL=300`) is comfortable; `120` is the safe default.
 
-| Error | Cause | Fix |
-|-------|-------|-----|
-| `ERROR: no hay URLs...` | URL list is empty | Edit `config.conf`, pass `-u <file>`, or pass a URL as the last argument |
-| `ERROR: archivo 'X' no existe` | `-u` file not found | Check the path and filename |
-| `ERROR: index N no existe (max M)` | `--once` index out of range | Use `./keepalive.sh --list` to see valid indexes |
-| `ERROR: esto es para macOS` | Run on a non-macOS system | This script is macOS-only |
+### I want to see what it's doing
 
-### Nothing happens when `--once` runs
+- `./keepdash.sh --show` opens a visible window with the dashboard.
+- `./keepdash.sh --once` does a single headless refresh so you can watch the log.
 
-Verify the browser is enabled (a browser flag or a `true` in `config.conf`) and is installed. If the browser is closed, the first navigation launches it — this can take a moment. `--once` prints the target URL before navigating, so check that the printed URL is correct.
+### I want to stop it
+
+`Ctrl+C` stops the cycle (it prints `Detenido.` and shuts down the dashboard), or
+run `./keepdash.sh --stop` from another terminal.
+
+### Stuck: the script reports the dashboard did not start
+
+If a previous instance from the same profile is still running, the script kills
+it on boot. If a bad profile blocks
+startup, the boot retries up to ~20 s then exits with an error. Check that the
+dedicated profile is not locked:
+
+```bash
+./keepdash.sh --stop
+```
 
 ## FAQ
 
-**Q: Does this log me in again or create a new session?**
-No. It reuses the existing tab and the session already open in that browser. That is the whole point: the server sees the same active user.
+**Q: Does this touch my normal Chrome/Safari/Firefox?**
+No. It launches its own Chrome with its own profile (`.dash-profile/`). Your
+personal and work profiles are never touched.
+
+**Q: Will Chrome appear on screen?**
+No. The cycle runs headless (`--headless=new`). It cannot show a window, steal
+focus, or interrupt typing. The only visible window is the one you open with
+`--login` or `--show`.
+
+**Q: Do I have to log in every time?**
+No. You authenticate once with `--login`; the headless cycle reuses that session
+indefinitely until it expires.
+
+**Q: Will stopping the script log me out?**
+No. Shutting the dashboard down does not destroy the SSO session cookies.
 
 **Q: Is this detectable like keep-alive plugins?**
-Plugins are detected because they use artificial traffic (headless requests, refreshing the home page). This script performs real navigation inside the real browser tab, which is indistinguishable from a human clicking links.
+Plugins get flagged for artificial traffic (headless requests, forced home-page
+refreshes). This performs real navigation in a real browser, indistinguishable
+from a human clicking — and your real browser is untouched.
 
-**Q: How do I make the traffic look more natural?**
-Add more distinct URLs to the list so each rotation looks like a different page visit, and set `INTERVAL` so it is not unnaturally frequent.
+## More documentation
 
-**Q: Can I use more than one browser at once?**
-Yes. Pass multiple flags (`-c -f`) or set multiple booleans to `true` in `config.conf`. Each rotation navigates the same URL in every enabled browser.
-
-**Q: Can I run this as a background daemon?**
-Not yet. It currently needs a terminal open. Running as a background agent is a planned feature (see `FUTURE_FEATURES.md`).
-
-**Q: What happens if I navigate the active tab myself while the script runs?**
-The script overwrites whatever is in the active tab. Reusing an existing tab by domain instead is a planned feature (see `FUTURE_FEATURES.md`).
-
-**Q: Is there a minimum interval?**
-No hard minimum, but intervals below a couple of minutes look automated. Match the interval to the portal's actual inactivity timeout.
+- [Planned features](FUTURE_FEATURES.md)

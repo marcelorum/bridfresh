@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
 # ============================================================
-#  Session Keep-Alive — macOS nativo
+#  [LEGACY] Session Keep-Alive — macOS nativo
+#  OBSOLETO: navegaba sobre la pestana del browser REAL (Chrome/Safari/
+#  Firefox) via AppleScript, y podía traer Chrome al frente.
+#  REEMPLAZADO por ../keepdash.sh (navegador-dashboard dedicado, headless,
+#  iver). Se conserva solo como referencia historica.
+#
 #  Evita los plugins detectables. Mantiene viva la sesion
 #  real de tu navegador rotando entre URLs.
 #
 #  Uso:
 #    ./keepalive.sh                       -> usa config.conf
-#    ./keepalive.sh -c -f -t 300 urls.txt -> Chrome+Firefox, 5 min, URLs desde archivo
+#    ./keepalive.sh -c -f -t 300 -u urls.txt -> Chrome+Firefox, 5 min, URLs desde archivo
 #    ./keepalive.sh -s https://miweb.com/a -> solo Safari, cicla esa URL
 #    ./keepalive.sh -c -u urls.txt -t 120 -> Chrome, archivo de URLs, 2 min
 #    ./keepalive.sh --list                -> muestra estado, no cicla
@@ -48,14 +53,71 @@ usage() {
 # ============================================================
 
 chrome_navigate() {
-  osascript -e "tell application \"Google Chrome\"
-    if (count of windows) > 0 then
-      set URL of active tab of front window to \"$1\"
-      if \"$RELOAD_MODE\" = \"force\" then
-        reload active tab of front window
+  # Estrategia "oculto y restauro" para que Chrome NO se asome NI por un
+  # instante (el keep-alive de un usuario que esta escribiendo no debe
+  # cortarle el foco):
+  #   1. Capturamos la app que esta al frente.
+  #   2. Colamos Chrome (Cmd+H) -> aunque la navegacion lo active, su ventana
+  #      esta oculta y no se ve ningun destello.
+  #   3. Navegamos la pestana target.
+  #   4. Restauramos el foco a la app anterior MIENTRAS Chrome sigue oculto.
+  #   5. Recien ahi mostramos Chrome de nuevo (queda detras, en background).
+  # Si el usuario ya esta en Chrome, no hacemos malabares (no hay flash posible).
+  local url="$1"
+  local frontApp=""
+  frontApp="$(osascript -e 'tell application "System Events" to get name of first application process whose frontmost is true' 2>/dev/null)"
+  local isChromeFront=false
+  [[ "$frontApp" == "Google Chrome" ]] && isChromeFront=true
+
+  if [[ "$isChromeFront" == false ]]; then
+    osascript -e 'tell application "System Events" to set visible of process "Google Chrome" to false' >/dev/null 2>&1
+  fi
+
+  # Si CHROME_MATCH_DOMAIN esta seteado (identifica el perfil de trabajo por
+  # el dominio de SUS pestanas), busca una pestana que lo contenga y navega ahi.
+  # Asi el refresh cae SIEMPRE en el perfil correcto aunque tengas varios
+  # perfiles de Chrome abiertos. Si no lo encuentra, usa la ventana frontal.
+  local matched=""
+  if [[ -n "${CHROME_MATCH_DOMAIN:-}" ]]; then
+    matched="$(osascript -e "
+      tell application \"Google Chrome\"
+        set done to false
+        repeat with w in windows
+          repeat with t in tabs of w
+            if (URL of t) contains \"${CHROME_MATCH_DOMAIN}\" then
+              set URL of t to \"$url\"
+              if \"$RELOAD_MODE\" = \"force\" then reload t
+              set done to true
+              exit repeat
+            end if
+          end repeat
+          if done then exit repeat
+        end repeat
+        if not done then return \"__NO_MATCH__\"
+      end tell
+      return \"ok\"" 2>/dev/null)"
+  fi
+  if [[ "$matched" != "ok" ]]; then
+    if [[ "$matched" == "__NO_MATCH__" ]]; then
+      echo "Chrome: no encontre pestana con '$CHROME_MATCH_DOMAIN'; uso la ventana frontal" >&2
+    fi
+    osascript -e "tell application \"Google Chrome\"
+      if (count of windows) > 0 then
+        set URL of active tab of front window to \"$url\"
+        if \"$RELOAD_MODE\" = \"force\" then
+          reload active tab of front window
+        end if
       end if
-    end if
-  end tell" >/dev/null 2>&1
+    end tell" >/dev/null 2>&1
+  fi
+
+  # Restauramos el foco a la app previa (Chrome aun oculto) y recien ahi mostramos Chrome.
+  if [[ "$isChromeFront" == false ]]; then
+    if [[ -n "$frontApp" && "$frontApp" != "Google Chrome" ]]; then
+      osascript -e "tell application \"System Events\" to set frontmost of first application process whose name is \"$frontApp\" to true" >/dev/null 2>&1
+    fi
+    osascript -e 'tell application "System Events" to set visible of process "Google Chrome" to true' >/dev/null 2>&1
+  fi
 }
 
 safari_navigate() {

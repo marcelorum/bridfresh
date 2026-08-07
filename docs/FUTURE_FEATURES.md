@@ -1,46 +1,70 @@
-# Session Keep-Alive — Future Features
+# keepdash — Future Features
 
-Planned enhancements, none of them implemented yet. Ordered by the impact they would have on daily use.
+Planned enhancements for `keepdash.sh`, none of them implemented yet. Ordered by
+the impact they would have on daily use. These build on the current design — a
+dedicated, headless Chrome dashboard controlled over HTTP (DevTools Protocol).
 
 | # | Feature | Problem it solves |
 |---|---------|-------------------|
-| 1 | Reuse an existing tab by domain | Navigating the active tab overwrites tabs you are actually using |
-| 2 | Simulated mouse movement / scroll | Some portals require real interaction, not just navigation |
-| 3 | Run as a background agent | The script currently needs a terminal open |
+| 1 | Reuse an existing tab by domain | Refreshing overwrites a tab you are actually using |
+| 2 | Simulated mouse movement / scroll | Some portals need real interaction, not just navigation |
+| 3 | Automatic daemon mode | The script currently needs a terminal open (or a `--login` run first) |
+| 4 | Expiry / status notification | You only find out the session died when the loop stops |
+| 5 | Better packaging and distribution | Keep-alive should be a single runnable install, not a repo clone |
 
 ## 1. Reuse an existing tab by domain
 
-**Problem**: the script navigates the **active tab** of the front window. If that tab holds content you are using, it gets overwritten on every rotation.
+**Problem**: the dashboard refresh currently closes all tabs and opens the next
+URL. That is fine for a dedicated invisible instance, but if you ever point it at
+an existing profile, it would overwrite a tab you are using.
 
-**Proposed approach**: before navigating, search the open tabs for one whose URL matches the target domain and navigate *that* tab. Fall back to creating a new tab when no match exists.
+**Proposed approach**: before navigating, list the open tabs and navigate a tab
+whose URL matches the target domain, falling back to opening the URL if none.
 
-- Recommended strategy: match by **domain**, not full URL, so the same domain's tabs are reused even when the target path differs. Fall back to `make new tab` when nothing matches.
-- Chrome exposes all windows and tabs to AppleScript by iterating:
-
-  ```applescript
-  repeat with w in windows
-    repeat with t in tabs of w
-      get URL of t
-    end repeat
-  end repeat
-  ```
-
-- Technical note: the same iteration pattern is available for Safari. Firefox remains a constraint, since it does not expose tab URLs to AppleScript at all.
+- The CDP already exposes all targets via `GET /json/list`, so matching by domain
+  is feasible with the HTTP control the script already uses.
 
 ## 2. Simulated mouse movement / scroll
 
-**Problem**: some portals only treat real user interaction (mouse movement, scroll) as activity; simple page navigation is not enough to keep the session alive.
+**Problem**: some portals only treat real user interaction (mouse move, scroll,
+clicks) as activity; a simple navigation is not enough to keep the session alive.
 
-**Proposed approach**: add an option that, on each rotation (or on an independent timer), simulates a small mouse move or scroll via AppleScript `System Events`. This is the same mechanism already used for Firefox keystrokes.
+**Proposed approach**: add an option to inject a small, varied, infrequent mouse
+move or scroll into the dashboard via the DevTools Protocol (HTTP or websocket),
+independent of the navigation interval.
 
-- Technical note: the current implementation already drives `System Events` for Firefox, so the infrastructure to send synthetic events exists in the codebase.
-- Technical note: synthetic mouse events may trigger a different class of anti-bot heuristics (input events at fixed coordinates look scripted). If adopted, movement should be small, varied, and infrequent to stay under the radar.
+- Technical note: synthetic input should stay small and irregular so it does not
+  look scripted to anti-bot heuristics.
 
-## 3. Run as a background agent / daemon
+## 3. Automatic daemon mode
 
-**Problem**: the script needs a terminal open for its whole run. Closing the terminal stops the keep-alive.
+**Problem**: keep-alive currently needs a terminal running the cycle. Closing the
+terminal stops it, and after a reboot you must re-run `--login` and the loop.
 
-**Proposed approach**: wrap the rotation loop as a launchd agent (LaunchAgent) that starts at login and runs without a terminal window.
+**Proposed approach**: wrap the headless loop as a `launchd` LaunchAgent that
+starts at login, reuses the stored SSO session in `.dash-profile/`, and runs
+without a terminal window.
 
-- Technical note: the script already accepts a `--list` mode and a `--once` mode, so it can be invoked non-interactively; a daemon wrapper would run the main loop with logging to a file instead of the terminal.
-- Technical note: logging and error visibility need a defined destination (e.g., a log file under `~/Library/Logs/`) since stdout will no longer be a terminal.
+- The script already supports non-interactive modes (`--once`) and a clean stop
+  (`--stop`), which a daemon wrapper can call.
+- Logging needs a defined destination (e.g. a file under `~/Library/Logs/`)
+  since stdout will no longer be a terminal.
+
+## 4. Session-expiry / status notification
+
+**Problem**: when the session expires, the loop stops and prints a message — but
+only if you are watching the terminal. You may not realize keep-alive has stopped.
+
+**Proposed approach**: when `dash_needs_auth()` triggers, post a macOS
+notification (e.g. `osascript`/`notifyutil`) telling you to run `--login`, and/or
+write status to a small state file the UI can read.
+
+## 5. Better packaging / distribution
+
+**Problem**: today it is a repo with a script, a profile directory, and templates.
+Sharing or installing it is not turnkey.
+
+**Proposed approach**: explore shipping the script as a single-file installer or
+app bundle that creates the needed files (`config.conf`, `urls.txt`) and the
+`.dash-profile/` directory on first run, and preserves the same zero-dependency
+design.
