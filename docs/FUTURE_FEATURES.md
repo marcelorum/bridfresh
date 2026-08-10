@@ -7,7 +7,7 @@ dashboard controlled over HTTP (DevTools Protocol).
 | # | Feature | Status |
 |---|---------|--------|
 | 1 | Automatic daemon mode | Planned |
-| 2 | Session-expiry warning + re-login | ✅ Implemented (v1) |
+| 2 | Session-expiry re-login | ✅ Implemented (v1) |
 | 3 | Random jitter on refresh interval | Planned |
 
 ## 1. Automatic daemon mode
@@ -24,21 +24,20 @@ without a terminal window.
 - Logging needs a defined destination (e.g. a file under `~/Library/Logs/`)
   since stdout will no longer be a terminal.
 
-## 2. Session-expiry warning + re-login ✅
+## 2. Session-expiry re-login ✅
 
-**Implemented**: when the session has been alive for ~24 min (5 min before the
-~29 min `TAsessionID` expiry), the cycle prints a warning and prompts:
+**Implemented**: when the session expires (detected by a redirect to a
+`login`/`okta` page), the cycle prompts:
 
 ```text
-⚠  La sesión expira en ~5 min.
+La sesion expiro.
 ¿Abrir el navegador para re-login? [Y/n]
 ```
 
 - **Y** (or Enter): stops headless, opens a visible Chrome window for SSO + 2FA,
   then resumes the invisible cycle automatically.
-- **Anything else**: the cycle continues and will stop when the session dies.
-
-After a successful re-login the timer resets for another ~24 min.
+- **Anything else**: the cycle stops and tells you to run `./keepdash.sh --login`
+  manually.
 
 ## 3. Random jitter on refresh interval
 

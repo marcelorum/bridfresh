@@ -29,8 +29,8 @@
 #    -u <file>  archivo con una URL por linea (pisa las de config.conf)
 #    -h         ayuda
 #
-#  Nota: el script avisa ~5 min antes de que la sesion expire (~29 min).
-#  Si respondés Y, abre la ventana de login automaticamente.
+#  Si la sesion expira (detectada por redirect a login), avisa y ofrece
+#  re-login automatico con Y/n.
 # ============================================================
 
 set -u
@@ -40,8 +40,6 @@ PROFILE_DIR="$SCRIPT_DIR/.dash-profile"      # perfil dedicado (privado, gitigno
 PORT=9222                                     # puerto local de control (CDP)
 INTERVAL=240                                  # default: refresco cada 4 min
 DURATION_MINS=0                               # 0 = sin limite (corre hasta --stop / Ctrl+C)
-EXPIRY_WARNING_SECS=$((24 * 60))              # avisar 5 min antes de la expiración (~29 min)
-SESSION_EXPIRY_NOTIFIED=false                 # solo avisa una vez
 
 # URL por default si no hay URLS en config.conf ni -u <archivo>.
 DEFAULT_URLS=(
@@ -271,14 +269,13 @@ while true; do
     dash_stop
     exit 0
   fi
-  # Aviso de expiración: 5 min antes de que la sesión muera (~29 min).
-  if [[ "$SESSION_EXPIRY_NOTIFIED" == false ]] && (( $(date +%s) - START_TS >= EXPIRY_WARNING_SECS )); then
-    SESSION_EXPIRY_NOTIFIED=true
+  # Chequeo de sesion expirada: redirect a login → ofrece re-login.
+  if dash_needs_auth; then
     echo ""
-    echo "⚠  La sesión expira en ~5 min."
+    echo "La sesion expiro."
     echo -n "¿Abrir el navegador para re-login? [Y/n] "
     read -r answer </dev/tty
-    answer="${answer,,}"  # lowercase
+    answer="${answer,,}"
     if [[ "$answer" == "y" || "$answer" == "" ]]; then
       echo "Deteniendo ciclo invisible y abriendo ventana de login..."
       dash_stop
@@ -286,41 +283,28 @@ while true; do
       dash_boot true || { echo "ERROR: no se pudo abrir la ventana." >&2; exit 1; }
       echo ""
       echo "Logueate en el dashboard (SSO + 2FA)."
-      echo "Cuando termines, escribí 'done' y apretá Enter."
+      echo "Cuando termines, escribi 'done' y apreta Enter."
       while true; do
         echo -n "> "
         read -r reply </dev/tty
         [[ "${reply,,}" == "done" ]] && break
-        echo "Escribí 'done' cuando termines de loguearte."
+        echo "Escribi 'done' cuando termines de loguearte."
       done
       echo "Reanudando ciclo invisible..."
       dash_stop
       sleep 2
       dash_boot false || { echo "ERROR: no se pudo reanudar el navegador." >&2; exit 1; }
-      START_TS="$(date +%s)"  # reset timer para el próximo warning
       echo "Ciclo invisible reanudado."
     else
-      echo "Ok, el ciclo sigue. La sesión expirará cuando toque."
+      echo "Ok, corré  ./keepdash.sh --login  cuando quieras re-loguearte."
+      dash_stop
+      exit 1
     fi
-  fi
-  if dash_needs_auth; then
-    echo ""
-    echo "La sesion expiro. Corre  ./keepdash.sh --login  para autenticar de nuevo."
-    dash_stop
-    exit 1
   fi
   url="${URLS[$((idx % ${#URLS[@]}))]}"
   ts="$(date '+%H:%M:%S')"
   echo "[$ts]"
   dash_refresh "$url"
-  # Chequeo IMMEDIATO: si el refresh aterrizó en login, abortá ahora.
-  # (el chequeo de arriba solo tapa la expiración previa al loop)
-  if dash_needs_auth; then
-    echo ""
-    echo "La sesion expiro justo al refrescar. Corre  ./keepdash.sh --login."
-    dash_stop
-    exit 1
-  fi
   idx=$((idx + 1))
   sleep "$INTERVAL"
 done

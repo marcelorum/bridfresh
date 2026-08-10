@@ -67,10 +67,9 @@ bridfresh/
 | `./keepdash.sh --stop` | Shut down the dedicated dashboard |
 | `./keepdash.sh --show` | Open a visible window to look at the dashboard |
 
-If your session is about to expire (~5 min warning), the cycle prompts you to
-open a visible window for re-login. Type `Y` to launch the login window
-automatically, or anything else to skip. If the session does expire, the cycle
-detects a `login` page and tells you to run `./keepdash.sh --login` again.
+If your session expires, the cycle detects a `login` page and prompts you to
+re-login: type `Y` to open the login window automatically, or anything else
+to stop and run `./keepdash.sh --login` manually.
 
 ## More documentation
 
