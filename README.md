@@ -16,10 +16,8 @@ after a few minutes of inactivity — and that detects keep-alive plugins.
 ```
 bridfresh/
 ├── keepdash.sh              → the main script (keep-alive dashboard)
-├── config.conf              → PRIVATE, gitignored (your settings)
-├── urls.txt                 → PRIVATE, gitignored (your URLs)
-├── config.example.conf      → committed template for config.conf
-├── urls.example.txt          → committed template for urls.txt
+├── config.conf              → PRIVATE, gitignored (your settings + URLs to cycle)
+├── config.example.conf      → committed template for config.conf (shows the URLS= block)
 ├── .dash-profile/           → PRIVATE SSO profile, gitignored
 ├── legacy/keepalive.sh      → old script, kept for reference (do not use)
 ├── docs/MANUAL.md           → full usage manual
@@ -43,18 +41,20 @@ From then on, just start the invisible cycle:
 ```
 
 That's it. The dedicated dashboard rotates your URLs in the background, headless,
-every 120 seconds. Press `Ctrl+C` to stop, or run `./keepdash.sh --stop`.
+every 5 minutes. Press `Ctrl+C` to stop, or run `./keepdash.sh --stop`.
 
-> **Privacy note**: `config.conf`, `urls.txt`, and `.dash-profile/` are private and
-> gitignored — they contain your real targets and your SSO session. Never commit
-> them. `config.example.conf` and `urls.example.txt` are the committed templates.
+> **Privacy note**: `config.conf` and `.dash-profile/` are private and
+> gitignored — `config.conf` holds your real URLs (and optional interval) and
+> `.dash-profile/` holds your SSO session. Never commit them. `config.example.conf`
+> is the only committed template.
 
 ## The essential flow
 
 | Command | What it does |
 |---------|--------------|
 | `./keepdash.sh --login` | Open a **visible** window once to authenticate (SSO + 2FA) |
-| `./keepdash.sh` | Run the **invisible** cycle (default 120 s) |
+| `./keepdash.sh` | Run the **invisible** cycle (default 300 s / 5 min) |
+| `./keepdash.sh -d 1h` | Run the cycle for a limited time (`30m`, `1h`, `2h`…) |
 | `./keepdash.sh --once` | One refresh, for testing |
 | `./keepdash.sh --stop` | Shut down the dedicated dashboard |
 | `./keepdash.sh --show` | Open a visible window to look at the dashboard |
@@ -64,7 +64,7 @@ If your session expires, the cycle detects a `login` page and tells you to run
 
 ## More documentation
 
-- [Full usage manual](docs/MANUAL.md) — flags, config, `urls.txt`, troubleshooting
+- [Full usage manual](docs/MANUAL.md) — flags, config (`URLS=` + `INTERVAL`), troubleshooting
 - [Planned features](docs/FUTURE_FEATURES.md)
 
 ## License

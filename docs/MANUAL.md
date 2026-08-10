@@ -14,7 +14,7 @@ dashboard that keeps your session alive by rotating URLS on a schedule.
   - [Command-line flags](#command-line-flags)
     - [Flag semantics](#flag-semantics)
   - [Example uses](#example-uses)
-  - [URL file format](#url-file-format)
+  - [URL configuration](#url-configuration)
   - [Configuration reference](#configuration-reference)
   - [Session state](#session-state)
   - [Troubleshooting](#troubleshooting)
@@ -75,12 +75,12 @@ You only ever need `--login` again when the session expires.
 ```
 
 Starts the dedicated dashboard headless and cycles through your URLs every
-`interval` seconds (default 120 s). The terminal shows a timestamp and which
+`interval` seconds (default 300 s / 5 min). The terminal shows a timestamp and which
 dashboard was refreshed:
 
 ```text
 Navegador-dashboard invisible arriba.
-Alternando invisible. Ciclo: 120s, 3 URL(s).
+Alternando invisible. Ciclo: 300s, 3 URL(s).
 Para detener:      ./keepdash.sh --stop
 Para ver/login:     ./keepdash.sh --login
 ---
@@ -97,7 +97,8 @@ Stop it with `Ctrl+C` (prints `Detenido.` and shuts down headless cleanly) or
 |------|----------|--------|
 | `-h` / `--help` | — | Print the help text and exit |
 | `-t` | `<sec>` | Interval between refreshes, in seconds (default: `config.conf`) |
-| `-u` | `<file>` | Read URLs from a file, one per line |
+| `-d` | `<dur>` | Total runtime: `30m`, `1h`, `2h` or plain minutes. The cycle stops by itself when reached (no limit by default) |
+| `-u` | `<file>` | Read URLs from a file (overrides the `URLS=` in `config.conf`) |
 | `--login` | — | Open a **visible** window to authenticate (or to view) |
 | `--once` | — | One refresh, then exit (for testing) |
 | `--stop` | — | Shut down the dedicated dashboard |
@@ -112,42 +113,53 @@ Stop it with `Ctrl+C` (prints `Detenido.` and shuts down headless cleanly) or
   for verifying the setup.
 - `-t <sec>` overrides the interval. Any positive value works; match it to the
   portal's actual inactivity timeout.
+- `-d <dur>` limits how long the cycle runs: `30m`, `1h`, `2h`, or a plain
+  number of minutes such as `90`. When the time is up, it shuts down and exits
+  cleanly; without `-d` it runs until `Ctrl+C` or `--stop`.
 - `-u <file>` must point to an existing file, or the script exits with an error.
+  When given, it overrides the URLs defined in `config.conf`.
 
 ## Example uses
 
 ```bash
-./keepdash.sh               # headless, 120s default
+./keepdash.sh               # headless, 300s default (5 min)
 ./keepdash.sh -t 300        # refresh every 5 minutes
-./keepdash.sh -u myurls.txt # URLs from a specific file
+./keepdash.sh -d 90m        # run for 90 minutes, then stop by itself
+./keepdash.sh -d 2h         # run for 2 hours
+./keepdash.sh -u myurls.txt # URLs from a specific file (overrides config.conf)
 ./keepdash.sh --once        # one refresh to test
 ./keepdash.sh --show        # open the dashboard to look at it
 ./keepdash.sh --stop        # shut the dashboard down
 ./keepdash.sh --login       # authenticate (SSO + 2FA)
 ```
 
-## URL file format
+## URL configuration
 
-The file passed to `-u <file>`, or the default `urls.txt`, is plain text:
-
-- One URL per line, cycled in file order.
-- Empty lines are ignored.
-- Lines starting with `#` are ignored.
-- Everything after a `#` on a line is ignored (inline comments).
-- Whitespace around each line is trimmed.
-
-Example (`urls.txt`):
+Your URLs to cycle live in **`config.conf`** (private, gitignored), under the
+`URLS=( ... )` array — one URL per line, in cycling order:
 
 ```text
-# one URL per line, cycled in this order
-https://tu-web.com/dashboard
-https://tu-web.com/lista
-https://tu-web.com/perfil
+URLS=(
+  "https://tu-web.com/dashboard"
+  "https://tu-web.com/lista"
+)
 ```
 
-The script picks **`urls.txt` next to it automatically** if present, so you run
-`./keepdash.sh` with no `-u` and it still uses your real URLs. If you pass `-u`,
-that file wins. If the file does not exist, the script exits with an error.
+Rules:
+
+- One URL per line, cycled in array order.
+- Empty lines are ignored.
+- Lines starting with `#` are ignored (inline comments too).
+- Whitespace around each line is trimmed.
+- Quoting each URL is optional.
+
+The script reads `URLS=` from `config.conf` by default, so `./keepdash.sh` runs
+your real dashboards with no extra arguments. If `config.conf` defines no URLs,
+the script falls back to a single built-in default URL.
+
+`-u <file>` still accepts a plain-text URL list (same rules as above) and
+**overrides** the config URLs — useful for a one-off rotation. If that file does
+not exist, the script exits with an error.
 
 ## Configuration reference
 
@@ -158,15 +170,16 @@ automatically — it is **private and gitignored**. Copy the template to create 
 cp config.example.conf config.conf
 ```
 
-Today the script reads **`INTERVAL`** from it as the default interval:
+Today the script reads the URLs to cycle and the default interval from it:
 
 | Setting | Default | Values | Meaning |
 |---------|---------|--------|---------|
-| `INTERVAL` | `120` | seconds | Time between refreshes, in seconds |
+| `URLS=( ... )` | `URLS=()` | URL list | URLs to cycle, one per line (used by default) |
+| `INTERVAL` | `300` | seconds | Time between refreshes, in seconds |
 
 Other keys in `config.example.conf` are carried over from the legacy script and
-are not used by `keepdash.sh` yet. Keep the file if you want to set a default
-interval; the `-t` flag overrides it.
+are not used by `keepdash.sh` yet. Keep the file to set your default URLs and
+interval; the `-u` and `-t` flags override them.
 
 ## Session state
 
@@ -196,8 +209,8 @@ window, and ask you to authenticate. Run `./keepdash.sh --login` once, then
 
 ### The cycle feels too busy or too slow
 
-Tune the interval. If your session expires after ~5 minutes, `-t 300` (or
-`INTERVAL=300`) is comfortable; `120` is the safe default.
+Tune the interval. If your session expires after ~5 minutes, `300` (5 min)
+is the safe default; `120` if it expires faster.
 
 ### I want to see what it's doing
 

@@ -11,10 +11,9 @@
 
 # Keepalive local state — URLs are personal, don't commit real session targets
 config.conf
-urls.txt
 # Perfil dedicado del navegador-dashboard (contiene tu login SSO; privado)
 .dash-profile/
-# (config.example.conf and urls.example.txt ARE committed as templates)
+# (config.example.conf IS committed as the config template)
 
 # Local tooling (keep out of repo)
 .atl/
