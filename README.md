@@ -27,26 +27,31 @@ bridfresh/
 
 ## Quick start
 
-First-time setup (**this is the only time you see a window**):
-
 ```bash
+# 1. Clone the repo
+git clone https://github.com/marcelorum/bridfresh.git
+cd bridfresh
+
+# 2. Create your config (private, gitignored)
+cp config.example.conf config.conf
+
+# 3. Add your dashboard URLs in config.conf
+#    Edit the URLS=( ... ) block, one URL per line.
+
+# 4. First-time login — opens a visible Chrome window (SSO + 2FA)
 ./keepdash.sh --login
-```
 
-Log into the dashboard (SSO + 2FA). The session is saved to `.dash-profile/`.
-From then on, just start the invisible cycle:
-
-```bash
+# 5. Run the invisible cycle
 ./keepdash.sh
 ```
 
-That's it. The dedicated dashboard rotates your URLs in the background, headless,
-every 5 minutes. Press `Ctrl+C` to stop, or run `./keepdash.sh --stop`.
+The dashboard rotates your URLs headless every 5 minutes. Press `Ctrl+C` to stop,
+or `./keepdash.sh --stop` from another terminal. Use `-d 1h` to auto-stop after
+a duration.
 
 > **Privacy note**: `config.conf` and `.dash-profile/` are private and
-> gitignored — `config.conf` holds your real URLs (and optional interval) and
-> `.dash-profile/` holds your SSO session. Never commit them. `config.example.conf`
-> is the only committed template.
+> gitignored — never commit them. `config.example.conf` is the only committed
+> template.
 
 ## The essential flow
 
