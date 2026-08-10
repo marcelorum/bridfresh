@@ -31,7 +31,7 @@ cp config.example.conf config.conf
 ./keepdash.sh
 ```
 
-The dashboard rotates your URLs headless every 5 minutes. Press `Ctrl+C` to stop,
+The dashboard rotates your URLs headless every 4 minutes. Press `Ctrl+C` to stop,
 or `./keepdash.sh --stop` from another terminal. Use `-d 1h` to auto-stop after
 a duration.
 
@@ -58,7 +58,7 @@ bridfresh/
 | Command | What it does |
 |---------|--------------|
 | `./keepdash.sh --login` | Open a **visible** window once to authenticate (SSO + 2FA) |
-| `./keepdash.sh` | Run the **invisible** cycle (default 300 s / 5 min) |
+| `./keepdash.sh` | Run the **invisible** cycle (default 240 s / 4 min) |
 | `./keepdash.sh -d 1h` | Run the cycle for a limited time (`30m`, `1h`, `2h`…) |
 | `./keepdash.sh --once` | One refresh, for testing |
 | `./keepdash.sh --stop` | Shut down the dedicated dashboard |
