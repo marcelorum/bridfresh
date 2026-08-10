@@ -15,16 +15,18 @@
 #    ./keepdash.sh            -> de ahi en mas: cicla en headless (invisible).
 #
 #  Uso:
-#    ./keepdash.sh               -> ciclo en headless, invisible (120s default).
+#    ./keepdash.sh               -> ciclo en headless, invisible (300s default; URLs en config.conf).
 #    ./keepdash.sh --login       -> abre ventana headed para login (o para ver).
-#    ./keepdash.sh -t 300        -> intervalo 5 min.
-#    ./keepdash.sh -u urls.txt   -> URLs desde archivo.
+#    ./keepdash.sh -t 300        -> intervalo 5 min (default).
+#    ./keepdash.sh -d 1h         -> corre 1 hora y sale solo.
+#    ./keepdash.sh -u <archivo>  -> URLs desde un archivo (pisa las de config.conf).
 #    ./keepdash.sh --once        -> un solo refresco (prueba).
 #    ./keepdash.sh --stop        -> apaga la instancia dedicada.
 #
 #  Flags:
+#    -d <dur>   duracion total: 30m, 1h, 2h o minutos sueltos (default: sin limite)
 #    -t <seg>   intervalo entre refrescos (default: config.conf)
-#    -u <file>  archivo con una URL por linea
+#    -u <file>  archivo con una URL por linea (pisa las de config.conf)
 #    -h         ayuda
 # ============================================================
 
@@ -33,21 +35,43 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 PROFILE_DIR="$SCRIPT_DIR/.dash-profile"      # perfil dedicado (privado, gitignored)
 PORT=9222                                     # puerto local de control (CDP)
-INTERVAL=120
+INTERVAL=300                                  # default: refresco cada 5 min
+DURATION_MINS=0                               # 0 = sin limite (corre hasta --stop / Ctrl+C)
 
-# URL por default si no hay urls.txt ni -u <archivo>.
+# URL por default si no hay URLS en config.conf ni -u <archivo>.
 DEFAULT_URLS=(
   "https://www.kyndryl.com/bridge/aiops/home"
 )
 
-# --- CONFIG (si existe): tomamos solo INTERVAL como default ---
+# --- CONFIG (si existe): tomamos INTERVAL y URLS=( ... ) como default ---
 CONFIG="$SCRIPT_DIR/config.conf"
+URLS_CFG=()
 if [[ -f "$CONFIG" ]]; then
   _iv="$(sed -n 's/^INTERVAL=\([0-9]*\).*/\1/p' "$CONFIG" | head -1)"
   [[ -n "$_iv" ]] && INTERVAL="$_iv"
+  # URLS=( ... ): cada linea dentro del bloque es una URL a ciclar.
+  while IFS= read -r _u; do
+    [[ -n "$_u" ]] && URLS_CFG+=("$_u")
+  done < <(sed -n '/^[[:space:]]*URLS=(/,/^[[:space:]]*)/p' "$CONFIG" \
+      | sed '1d;$d' \
+      | sed -E 's/#.*$//; s/^[[:space:]]+//; s/[[:space:]]+$//; s/^"(.*)"$/\1/; s/^'"'"'(.*)'"'"'$/\1/')
 fi
 
-usage() { sed -n '10,32p' "$0"; exit 0; }
+# --- Duracion: convierte 30m / 1h / 2h (o minutos sueltos) a minutos ----
+parse_duration() {
+  local v="$1"
+  case "$v" in
+    *h) DURATION_MINS="${v%h}"; DURATION_MINS=$((DURATION_MINS * 60)) ;;
+    *m) DURATION_MINS="${v%m}" ;;
+    *)  DURATION_MINS="$v" ;;
+  esac
+  if ! [[ "$DURATION_MINS" =~ ^[0-9]+$ ]] || [[ "$DURATION_MINS" -eq 0 ]]; then
+    echo "ERROR: duracion invalida '$1' (usa 30m, 1h, 2h o minutos sueltos)." >&2
+    exit 1
+  fi
+}
+
+usage() { sed -n '10,/^# ====.*$/p' "$0"; exit 0; }
 
 LOG=false
 ONE=false
@@ -72,10 +96,11 @@ while [[ $i -lt ${#args[@]} ]]; do
   i=$((i + 1))
 done
 set -- "${ARGS[@]+"${ARGS[@]}"}"
-while getopts "t:u:h" opt; do
+while getopts "t:u:d:h" opt; do
   case "$opt" in
     t) INTERVAL="$OPTARG" ;;
     u) URL_FILE="$OPTARG" ;;
+    d) parse_duration "$OPTARG" ;;
     h) usage ;;
     *) usage ;;
   esac
@@ -86,21 +111,15 @@ if [[ -n "${URL_FILE:-}" ]]; then
   if [[ ! -f "$URL_FILE" ]]; then
     echo "ERROR: archivo '$URL_FILE' no existe" >&2; exit 1
   fi
-else
-  # Por defecto: si existe urls.txt en el directorio del script, úsalo.
-  # Así el ciclo corre tus dashboards reales sin pasar -u cada vez.
-  if [[ -f "$SCRIPT_DIR/urls.txt" ]]; then
-    URL_FILE="$SCRIPT_DIR/urls.txt"
-  fi
-fi
-
-if [[ -n "${URL_FILE:-}" ]]; then
   URLS=()
   while IFS= read -r line; do
     line="${line%%#*}"
     line="$(printf '%s' "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
     [[ -n "$line" ]] && URLS+=("$line")
   done < "$URL_FILE"
+elif [[ ${#URLS_CFG[@]} -gt 0 ]]; then
+  # Sin -u: si config.conf define URLS=( ... ), esas son las que ciclan.
+  URLS=("${URLS_CFG[@]}")
 fi
 
 if [[ ${#URLS[@]} -eq 0 ]]; then
@@ -231,13 +250,22 @@ if dash_needs_auth; then
 fi
 
 echo "Alternando invisible. Ciclo: ${INTERVAL}s, ${#URLS[@]} URL(s)."
+[[ "$DURATION_MINS" -gt 0 ]] && echo "Duracion: ${DURATION_MINS} min (sale solo al cumplirse)."
 echo "Para detener:      ./keepdash.sh --stop"
 echo "Para ver/login:    ./keepdash.sh --login"
 echo "---"
 
 trap 'echo; echo "Detenido."; dash_stop; echo "Adios."; exit 0' INT
+START_TS="$(date +%s)"
 idx=0
 while true; do
+  # Chequeo de duracion: si se cumplio el tiempo, salgo limpio.
+  if [[ "$DURATION_MINS" -gt 0 ]] && (( $(date +%s) - START_TS >= DURATION_MINS * 60 )); then
+    echo ""
+    echo "Tiempo cumplido (${DURATION_MINS} min). Apagando el navegador-dashboard."
+    dash_stop
+    exit 0
+  fi
   if dash_needs_auth; then
     echo ""
     echo "La sesion expiro. Corre  ./keepdash.sh --login  para autenticar de nuevo."
