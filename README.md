@@ -11,20 +11,6 @@ not a bot. No extra dependencies; plain shell + `curl` + Chrome's DevTools Proto
 **Who it helps**: anyone with a portal, dashboard, or web app that logs you out
 after a few minutes of inactivity — and that detects keep-alive plugins.
 
-## Repository layout
-
-```
-bridfresh/
-├── keepdash.sh              → the main script (keep-alive dashboard)
-├── config.conf              → PRIVATE, gitignored (your settings + URLs to cycle)
-├── config.example.conf      → committed template for config.conf (shows the URLS= block)
-├── .dash-profile/           → PRIVATE SSO profile, gitignored
-├── legacy/keepalive.sh      → old script, kept for reference (do not use)
-├── docs/MANUAL.md           → full usage manual
-├── docs/FUTURE_FEATURES.md  → planned enhancements
-└── README.md                → this page
-```
-
 ## Quick start
 
 ```bash
@@ -52,6 +38,20 @@ a duration.
 > **Privacy note**: `config.conf` and `.dash-profile/` are private and
 > gitignored — never commit them. `config.example.conf` is the only committed
 > template.
+
+## Repository layout
+
+```
+bridfresh/
+├── keepdash.sh              → the main script (keep-alive dashboard)
+├── config.conf              → PRIVATE, gitignored (your settings + URLs to cycle)
+├── config.example.conf      → committed template for config.conf (shows the URLS= block)
+├── .dash-profile/           → PRIVATE SSO profile, gitignored
+├── legacy/keepalive.sh      → old script, kept for reference (do not use)
+├── docs/MANUAL.md           → full usage manual
+├── docs/FUTURE_FEATURES.md  → planned enhancements
+└── README.md                → this page
+```
 
 ## The essential flow
 
