@@ -1,14 +1,14 @@
 # keepdash — Future Features
 
-Planned enhancements for `keepdash.sh`, none of them implemented yet. Ordered by
-the impact they would have on daily use. These build on the current design — a
-dedicated, headless Chrome dashboard controlled over HTTP (DevTools Protocol).
+Planned enhancements for `keepdash.sh`. Ordered by the impact they would have
+on daily use. These build on the current design — a dedicated, headless Chrome
+dashboard controlled over HTTP (DevTools Protocol).
 
-| # | Feature | Problem it solves |
-|---|---------|-------------------|
-| 1 | Automatic daemon mode | The script currently needs a terminal open (or a `--login` run first) |
-| 2 | Expiry / status notification | You only find out the session died when the loop stops |
-| 3 | Random jitter on refresh interval | A fixed interval is a detectable bot pattern |
+| # | Feature | Status |
+|---|---------|--------|
+| 1 | Automatic daemon mode | Planned |
+| 2 | Session-expiry warning + re-login | ✅ Implemented (v1) |
+| 3 | Random jitter on refresh interval | Planned |
 
 ## 1. Automatic daemon mode
 
@@ -24,14 +24,21 @@ without a terminal window.
 - Logging needs a defined destination (e.g. a file under `~/Library/Logs/`)
   since stdout will no longer be a terminal.
 
-## 2. Session-expiry / status notification
+## 2. Session-expiry warning + re-login ✅
 
-**Problem**: when the session expires, the loop stops and prints a message — but
-only if you are watching the terminal. You may not realize keep-alive has stopped.
+**Implemented**: when the session has been alive for ~24 min (5 min before the
+~29 min `TAsessionID` expiry), the cycle prints a warning and prompts:
 
-**Proposed approach**: when `dash_needs_auth()` triggers, post a macOS
-notification (e.g. `osascript`/`notifyutil`) telling you to run `--login`, and/or
-write status to a small state file the UI can read.
+```text
+⚠  La sesión expira en ~5 min.
+¿Abrir el navegador para re-login? [Y/n]
+```
+
+- **Y** (or Enter): stops headless, opens a visible Chrome window for SSO + 2FA,
+  then resumes the invisible cycle automatically.
+- **Anything else**: the cycle continues and will stop when the session dies.
+
+After a successful re-login the timer resets for another ~24 min.
 
 ## 3. Random jitter on refresh interval
 
