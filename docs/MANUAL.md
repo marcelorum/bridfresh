@@ -75,12 +75,12 @@ You only ever need `--login` again when the session expires.
 ```
 
 Starts the dedicated dashboard headless and cycles through your URLs every
-`interval` seconds (default 300 s / 5 min). The terminal shows a timestamp and which
+`interval` seconds (default 240 s / 4 min). The terminal shows a timestamp and which
 dashboard was refreshed:
 
 ```text
 Navegador-dashboard invisible arriba.
-Alternando invisible. Ciclo: 300s, 3 URL(s).
+Alternando invisible. Ciclo: 240s, 3 URL(s).
 Para detener:      ./keepdash.sh --stop
 Para ver/login:     ./keepdash.sh --login
 ---
@@ -122,7 +122,7 @@ Stop it with `Ctrl+C` (prints `Detenido.` and shuts down headless cleanly) or
 ## Example uses
 
 ```bash
-./keepdash.sh               # headless, 300s default (5 min)
+./keepdash.sh               # headless, 240s default (4 min)
 ./keepdash.sh -t 300        # refresh every 5 minutes
 ./keepdash.sh -d 90m        # run for 90 minutes, then stop by itself
 ./keepdash.sh -d 2h         # run for 2 hours
@@ -175,7 +175,7 @@ Today the script reads the URLs to cycle and the default interval from it:
 | Setting | Default | Values | Meaning |
 |---------|---------|--------|---------|
 | `URLS=( ... )` | `URLS=()` | URL list | URLs to cycle, one per line (used by default) |
-| `INTERVAL` | `300` | seconds | Time between refreshes, in seconds |
+| `INTERVAL` | `240` | seconds | Time between refreshes, in seconds |
 
 Other keys in `config.example.conf` are carried over from the legacy script and
 are not used by `keepdash.sh` yet. Keep the file to set your default URLs and
@@ -209,7 +209,7 @@ window, and ask you to authenticate. Run `./keepdash.sh --login` once, then
 
 ### The cycle feels too busy or too slow
 
-Tune the interval. If your session expires after ~5 minutes, `300` (5 min)
+Tune the interval. If your session expires after ~5 minutes, `240` (4 min)
 is the safe default; `120` if it expires faster.
 
 ### I want to see what it's doing

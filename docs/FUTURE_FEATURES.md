@@ -8,6 +8,7 @@ dedicated, headless Chrome dashboard controlled over HTTP (DevTools Protocol).
 |---|---------|-------------------|
 | 1 | Automatic daemon mode | The script currently needs a terminal open (or a `--login` run first) |
 | 2 | Expiry / status notification | You only find out the session died when the loop stops |
+| 3 | Random jitter on refresh interval | A fixed interval is a detectable bot pattern |
 
 ## 1. Automatic daemon mode
 
@@ -31,3 +32,14 @@ only if you are watching the terminal. You may not realize keep-alive has stoppe
 **Proposed approach**: when `dash_needs_auth()` triggers, post a macOS
 notification (e.g. `osascript`/`notifyutil`) telling you to run `--login`, and/or
 write status to a small state file the UI can read.
+
+## 3. Random jitter on refresh interval
+
+**Problem**: a mathematically precise interval (e.g. exactly every 240s) is a
+detectable bot pattern. Humans don't refresh pages at exact regular intervals.
+
+**Proposed approach**: add a random jitter of 0–30 seconds before each sleep,
+so the effective interval varies between `INTERVAL-30` and `INTERVAL`. Trivial
+to implement (`$RANDOM % 30`) with zero dependencies. Low risk — server-side
+timing analysis is rare and expensive; the bigger detection vector is
+`--headless=new`, not interval precision.

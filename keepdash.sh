@@ -15,9 +15,9 @@
 #    ./keepdash.sh            -> de ahi en mas: cicla en headless (invisible).
 #
 #  Uso:
-#    ./keepdash.sh               -> ciclo en headless, invisible (300s default; URLs en config.conf).
+#    ./keepdash.sh               -> ciclo en headless, invisible (240s default; URLs en config.conf).
 #    ./keepdash.sh --login       -> abre ventana headed para login (o para ver).
-#    ./keepdash.sh -t 300        -> intervalo 5 min (default).
+#    ./keepdash.sh -t 240        -> intervalo 4 min (default).
 #    ./keepdash.sh -d 1h         -> corre 1 hora y sale solo.
 #    ./keepdash.sh -u <archivo>  -> URLs desde un archivo (pisa las de config.conf).
 #    ./keepdash.sh --once        -> un solo refresco (prueba).
@@ -35,7 +35,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 PROFILE_DIR="$SCRIPT_DIR/.dash-profile"      # perfil dedicado (privado, gitignored)
 PORT=9222                                     # puerto local de control (CDP)
-INTERVAL=300                                  # default: refresco cada 5 min
+INTERVAL=240                                  # default: refresco cada 4 min
 DURATION_MINS=0                               # 0 = sin limite (corre hasta --stop / Ctrl+C)
 
 # URL por default si no hay URLS en config.conf ni -u <archivo>.
