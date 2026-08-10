@@ -5,17 +5,27 @@ dashboard that keeps your session alive by rotating URLS on a schedule.
 
 ## Contents
 
-1. [Requirements](#requirements)
-2. [How it works](#how-it-works)
-3. [First time: login once](#first-time-login-once)
-4. [Daily use: the invisible cycle](#daily-use-the-invisible-cycle)
-5. [Command-line flags](#command-line-flags)
-6. [Examples](#examples)
-7. [URL file format](#url-file-format)
-8. [Configuration reference](#configuration-reference)
-9. [Session expiration](#session-expiration)
-10. [Troubleshooting](#troubleshooting)
-11. [FAQ](#faq)
+- [keepdash — Usage Manual](#keepdash--usage-manual)
+  - [Contents](#contents)
+  - [Requirements](#requirements)
+  - [How it works](#how-it-works)
+  - [First time: login once](#first-time-login-once)
+  - [Daily use — the invisible cycle](#daily-use--the-invisible-cycle)
+  - [Command-line flags](#command-line-flags)
+    - [Flag semantics](#flag-semantics)
+  - [Example uses](#example-uses)
+  - [URL file format](#url-file-format)
+  - [Configuration reference](#configuration-reference)
+  - [Session state](#session-state)
+  - [Troubleshooting](#troubleshooting)
+    - [The dashboard asks to log in again](#the-dashboard-asks-to-log-in-again)
+    - [Nothing happens / it exits saying the dashboard asks for auth](#nothing-happens--it-exits-saying-the-dashboard-asks-for-auth)
+    - [The cycle feels too busy or too slow](#the-cycle-feels-too-busy-or-too-slow)
+    - [I want to see what it's doing](#i-want-to-see-what-its-doing)
+    - [I want to stop it](#i-want-to-stop-it)
+    - [Stuck: the script reports the dashboard did not start](#stuck-the-script-reports-the-dashboard-did-not-start)
+  - [FAQ](#faq)
+  - [More documentation](#more-documentation)
 
 ## Requirements
 
@@ -39,13 +49,6 @@ open a URL, close tabs, list open targets. It rotates between your URLs every
 
 The cycle runs in **`--headless=new`** mode. Chrome is invisible and never grabs
 focus, so it cannot interrupt your typing or steal the window.
-
-### Why a dedicated dashboard instead of your real browser
-
-The previous script (`legacy/keepalive.sh`) navigated your real browser tab and
-could bring Chrome to the front. This version replaces that: it uses its own
-dedicated instance, so your browsing is untouched and the loop is truly invisible.
-The legacy script is kept in `legacy/` only for reference — **do not use it**.
 
 ## First time: login once
 
