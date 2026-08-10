@@ -91,6 +91,23 @@ Para ver/login:     ./keepdash.sh --login
 Stop it with `Ctrl+C` (prints `Detenido.` and shuts down headless cleanly) or
 `./keepdash.sh --stop`.
 
+### Session expiry warning
+
+About 5 minutes before the session expires (~24 min into the cycle), the script
+prints a warning and asks:
+
+```text
+⚠  La sesión expira en ~5 min.
+¿Abrir el navegador para re-login? [Y/n]
+```
+
+- **Y** (or Enter): stops headless, opens a visible Chrome window for you to
+  complete SSO + 2FA, then resumes the invisible cycle automatically.
+- **Anything else**: the cycle continues and will stop when the session dies.
+
+The warning appears only once per cycle. After a successful re-login the timer
+resets.
+
 ## Command-line flags
 
 | Flag | Argument | Effect |
@@ -192,8 +209,12 @@ logs you out — you would need to re-authenticate with `--login`.
 
 ### The dashboard asks to log in again
 
-The cycle checks for a `login`/`okta` page in two points — before each refresh
-and right after it. If it finds one, it stops the dashboard and tells you:
+About 5 minutes before the session expires, the script warns you and offers to
+open a login window. If you accepted the warning and completed re-login, the
+cycle resumes automatically.
+
+If you missed the warning (or answered `n`), the cycle detects a `login`/`okta`
+page and stops with:
 
 ```text
 La session expiro. Corre  ./keepdash.sh --login  para autenticar de nuevo.
