@@ -18,16 +18,19 @@ after a few minutes of inactivity — and that detects keep-alive plugins.
 git clone https://github.com/marcelorum/bridfresh.git
 cd bridfresh
 
-# 2. Create your config (private, gitignored)
+# 2. Make the script executable
+chmod +x keepdash.sh
+
+# 3. Create your config (private, gitignored)
 cp config.example.conf config.conf
 
-# 3. Add your dashboard URLs in config.conf
+# 4. Add your dashboard URLs in config.conf
 #    Edit the URLS=( ... ) block, one URL per line.
 
-# 4. First-time login — opens a visible Chrome window (SSO + 2FA)
+# 5. First-time login — opens a visible Chrome window (SSO + 2FA)
 ./keepdash.sh --login
 
-# 5. Run the invisible cycle
+# 6. Run the invisible cycle
 ./keepdash.sh
 ```
 
