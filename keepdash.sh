@@ -191,27 +191,44 @@ dash_needs_auth() {
     | grep -qE 'login\.|okta'
 }
 
-# Espera activa: polea cada 5s hasta que el login termino (ninguna pestana
-# en login/okta y el navegador siga arriba). Si la ventana se cerro, avisa
-# una vez. Ctrl+C aborta. Sin timeout: espera hasta que loguees.
+# Espera activa en DOS FASES: (1) primero espera a VER la pagina de login
+# (el redirect tarda; si nunca la vio, no puede estar logueado); (2) recien
+# cuando la vio, exige 3 polls limpios consecutivos (15s sin login/okta)
+# para declarar el login completo. Si la ventana se cerro, avisa una vez.
+# Ctrl+C aborta. Sin timeout: espera hasta que loguees.
 wait_for_login() {
-  local waited=0 warned=0
+  local waited=0 warned=0 saw_auth=0 clean=0
   echo ""
   echo "Esperando que termines de loguearte (se detecta solo)..."
   while true; do
-    if dash_is_up && ! dash_needs_auth; then
-      echo "Login detectado."
-      return 0
-    fi
-    if ! dash_is_up && [[ "$warned" -eq 0 ]]; then
-      warned=1
-      echo "   Ojo: la ventana no esta arriba (¿la cerraste?)."
-      echo "   Reabre con  ./keepdash.sh --login  o aborta con Ctrl+C."
+    if dash_is_up; then
+      if dash_needs_auth; then
+        saw_auth=1
+        clean=0
+      elif [[ "$saw_auth" -eq 1 ]]; then
+        clean=$((clean + 1))
+        if [[ "$clean" -ge 3 ]]; then
+          echo "Login detectado."
+          return 0
+        fi
+      fi
+    else
+      if [[ "$warned" -eq 0 ]]; then
+        warned=1
+        echo "   Ojo: la ventana no esta arriba (¿la cerraste?)."
+        echo "   Reabre con  ./keepdash.sh --login  o aborta con Ctrl+C."
+      fi
+      clean=0
     fi
     sleep 5
     waited=$((waited + 5))
     if (( waited % 30 == 0 )); then
-      echo "   ...sigo esperando (${waited}s). Ctrl+C para cancelar."
+      if [[ "$saw_auth" -eq 0 ]]; then
+        echo "   Todavia no veo la pagina de login (el redirect tarda)."
+        echo "   Si ya estabas logueado y no deberia esperar: Ctrl+C."
+      else
+        echo "   ...sigo esperando (${waited}s). Ctrl+C para cancelar."
+      fi
     fi
   done
 }
