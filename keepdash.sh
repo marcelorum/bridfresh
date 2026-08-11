@@ -275,7 +275,7 @@ while true; do
     echo "La sesion expiro."
     echo -n "¿Abrir el navegador para re-login? [Y/n] "
     read -r answer </dev/tty
-    answer="${answer,,}"
+    answer="$(echo "$answer" | tr '[:upper:]' '[:lower:]')"
     if [[ "$answer" == "y" || "$answer" == "" ]]; then
       echo "Deteniendo ciclo invisible y abriendo ventana de login..."
       dash_stop
@@ -287,7 +287,7 @@ while true; do
       while true; do
         echo -n "> "
         read -r reply </dev/tty
-        [[ "${reply,,}" == "done" ]] && break
+        [[ "$(echo "$reply" | tr '[:upper:]' '[:lower:]')" == "done" ]] && break
         echo "Escribi 'done' cuando termines de loguearte."
       done
       echo "Reanudando ciclo invisible..."
