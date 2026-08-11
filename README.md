@@ -31,9 +31,10 @@ cp config.example.conf config.conf
 ./keepdash.sh
 
 #    First run: if not logged in, it asks
-#    "¿Abrir el navegador para login? [Y/n]". Press Y (or Enter), complete
-#    SSO + 2FA in the window that opens, type "done", and the cycle resumes
-#    invisible by itself.
+#    "¿Abrir el navegador para login? [Y/n]" — one key, no Enter needed.
+#    Press Y (or just Enter): complete SSO + 2FA in the window that opens;
+#    the script detects when the login is done and resumes invisible by
+#    itself.
 #    (./keepdash.sh --login still opens the login window manually if you prefer.)
 ```
 
@@ -72,8 +73,9 @@ bridfresh/
 
 Both on the first run (no session yet) and when the session expires mid-cycle,
 the script detects a `login` page and asks **Y/n** whether to open the browser:
-type `Y` (or Enter) to authenticate and resume automatically, type `done` when
-finished; anything else stops the cycle.
+one key, no Enter needed — press `Y` (or just Enter) to open it; the script
+detects on its own when the login is complete and resumes automatically.
+Anything else stops the cycle.
 
 ## More documentation
 
