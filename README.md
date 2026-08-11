@@ -27,11 +27,14 @@ cp config.example.conf config.conf
 # 4. Add your dashboard URLs in config.conf
 #    Edit the URLS=( ... ) block, one URL per line.
 
-# 5. First-time login — opens a visible Chrome window (SSO + 2FA)
-./keepdash.sh --login
-
-# 6. Run the invisible cycle
+# 5. Run the invisible cycle — no separate login step needed
 ./keepdash.sh
+
+#    First run: if not logged in, it asks
+#    "¿Abrir el navegador para login? [Y/n]". Press Y (or Enter), complete
+#    SSO + 2FA in the window that opens, type "done", and the cycle resumes
+#    invisible by itself.
+#    (./keepdash.sh --login still opens the login window manually if you prefer.)
 ```
 
 The dashboard rotates your URLs headless every 4 minutes. Press `Ctrl+C` to stop,
@@ -60,16 +63,17 @@ bridfresh/
 
 | Command | What it does |
 |---------|--------------|
-| `./keepdash.sh --login` | Open a **visible** window once to authenticate (SSO + 2FA) |
-| `./keepdash.sh` | Run the **invisible** cycle (default 240 s / 4 min) |
+| `./keepdash.sh` | Run the **invisible** cycle (default 240 s / 4 min); asks to open the browser for login if you are not authenticated |
+| `./keepdash.sh --login` | Open a **visible** window manually (SSO + 2FA) — optional, the script asks you on first run |
 | `./keepdash.sh -d 1h` | Run the cycle for a limited time (`30m`, `1h`, `2h`…) |
 | `./keepdash.sh --once` | One refresh, for testing |
 | `./keepdash.sh --stop` | Shut down the dedicated dashboard |
 | `./keepdash.sh --show` | Open a visible window to look at the dashboard |
 
-If your session expires, the cycle detects a `login` page and prompts you to
-re-login: type `Y` to open the login window automatically, or anything else
-to stop and run `./keepdash.sh --login` manually.
+Both on the first run (no session yet) and when the session expires mid-cycle,
+the script detects a `login` page and asks **Y/n** whether to open the browser:
+type `Y` (or Enter) to authenticate and resume automatically, type `done` when
+finished; anything else stops the cycle.
 
 ## More documentation
 
