@@ -34,8 +34,9 @@ La sesion expiro.
 ¿Abrir el navegador para re-login? [Y/n]
 ```
 
-- **Y** (or Enter): stops headless, opens a visible Chrome window for SSO + 2FA,
-  then resumes the invisible cycle automatically.
+- **Y** (or Enter): a single keypress (no Enter needed) — stops headless, opens
+  a visible Chrome window for SSO + 2FA, detects the login on its own and
+  resumes the invisible cycle automatically.
 - **Anything else**: the cycle stops and tells you to run `./keepdash.sh --login`
   manually.
 

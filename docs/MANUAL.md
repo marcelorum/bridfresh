@@ -66,10 +66,11 @@ You don't need a separate login step — just start the cycle:
    ¿Abrir el navegador para login? [Y/n]
    ```
 
-3. Press `Y` (or Enter): the script switches to a **visible** Chrome window.
+3. Press `Y` (or Enter) — a single key, no Enter required: the script switches
+   to a **visible** Chrome window.
 4. Log in normally (SSO + 2FA).
-5. When you finish, type `done` and press Enter — the script closes the visible
-   window and resumes the invisible cycle by itself.
+5. That's it: the script notices on its own when the login is finished and
+   resumes the invisible cycle by itself.
 
 Your session is saved into `.dash-profile/` (cookies) and reused by the headless
 cycle from then on. Shutting Chrome down or stopping the dashboard **does not**
@@ -111,8 +112,9 @@ La sesion expiro.
 ¿Abrir el navegador para re-login? [Y/n]
 ```
 
-- **Y** (or Enter): stops headless, opens a visible Chrome window for you to
-  complete SSO + 2FA, then resumes the invisible cycle automatically.
+- **Y** (or Enter): a single keypress (no Enter needed) — stops headless, opens a
+  visible Chrome window for you to complete SSO + 2FA, then resumes the invisible
+  cycle automatically once it detects the login is done.
 - **Anything else**: the cycle stops and tells you to run `./keepdash.sh --login`
   manually.
 
@@ -226,8 +228,9 @@ logs you out — the script will ask you to log in again on the next run.
 ### The dashboard asks to log in again
 
 When the session expires, the cycle detects the login page and prompts you with
-**Y/n**. Type `Y` (or Enter) to open the login window, complete SSO + 2FA, type
-`done`, and the cycle resumes automatically. Anything else stops the script.
+**Y/n** (one key, no Enter). Press `Y` (or Enter) to open the login window,
+complete SSO + 2FA — the script detects the login on its own and resumes
+automatically. Anything else stops the script.
 
 If you declined, run `./keepdash.sh --login`, log in again, then restart
 `./keepdash.sh`.
@@ -235,9 +238,10 @@ If you declined, run `./keepdash.sh --login`, log in again, then restart
 ### Nothing happens / the script asks about auth at startup
 
 On a fresh profile the headless mode may land on a login page. The script
-detects it and asks **Y/n** to open the login window: press `Y`, complete
-SSO + 2FA, type `done`, and the cycle resumes by itself. If you prefer a manual
-window, decline and run `./keepdash.sh --login`.
+detects it and asks **Y/n** (one key) to open the login window: press `Y`,
+complete SSO + 2FA — no confirmation needed, the script detects the login and
+resumes by itself. If you prefer a manual window, decline and run
+`./keepdash.sh --login`.
 
 ### The cycle feels too busy or too slow
 

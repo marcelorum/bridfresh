@@ -12,9 +12,10 @@
 #
 #  PRIMERA VEZ (autenticacion SSO + 2FA):
 #    ./keepdash.sh            -> si no estas logueado, te pregunta si queres
-#                                abrir la ventana para login, espera 'done'
-#                                y reanuda el ciclo invisible. No hace falta
-#                                correr --login primero.
+#                                abrir la ventana para login (una tecla, sin
+#                                Enter), espera y DETECTA SOLO cuando terminas
+#                                de loguearte, y reanuda el ciclo invisible.
+#                                No hace falta correr --login primero.
 #    ./keepdash.sh --login    -> abre la VENTANA dedicada manualmente.
 #
 #  Uso:
@@ -33,8 +34,8 @@
 #    -h         ayuda
 #
 #  Si la sesion expira (detectada por redirect a login) o arrancas sin
-#  sesion, ofrece abrir el navegador para (re-)login con Y/n, espera la
-#  confirmacion ('done') y reanuda el ciclo invisible.
+#  sesion, ofrece abrir el navegador para (re-)login con Y/n (una tecla),
+#  detecta solo el login y reanuda el ciclo invisible.
 # ============================================================
 
 set -u
@@ -190,9 +191,51 @@ dash_needs_auth() {
     | grep -qE 'login\.|okta'
 }
 
-# Pide confirmacion Y/n y, si se acepta, abre la ventana headed para el
-# login (SSO + 2FA), espera 'done' y reanuda el modo invisible. Si se
-# rechaza, detiene la instancia y sale.
+# Espera activa en DOS FASES: (1) primero espera a VER la pagina de login
+# (el redirect tarda; si nunca la vio, no puede estar logueado); (2) recien
+# cuando la vio, exige 3 polls limpios consecutivos (15s sin login/okta)
+# para declarar el login completo. Si la ventana se cerro, avisa una vez.
+# Ctrl+C aborta. Sin timeout: espera hasta que loguees.
+wait_for_login() {
+  local waited=0 warned=0 saw_auth=0 clean=0
+  echo ""
+  echo "Esperando que termines de loguearte (se detecta solo)..."
+  while true; do
+    if dash_is_up; then
+      if dash_needs_auth; then
+        saw_auth=1
+        clean=0
+      elif [[ "$saw_auth" -eq 1 ]]; then
+        clean=$((clean + 1))
+        if [[ "$clean" -ge 3 ]]; then
+          echo "Login detectado."
+          return 0
+        fi
+      fi
+    else
+      if [[ "$warned" -eq 0 ]]; then
+        warned=1
+        echo "   Ojo: la ventana no esta arriba (¿la cerraste?)."
+        echo "   Reabre con  ./keepdash.sh --login  o aborta con Ctrl+C."
+      fi
+      clean=0
+    fi
+    sleep 5
+    waited=$((waited + 5))
+    if (( waited % 30 == 0 )); then
+      if [[ "$saw_auth" -eq 0 ]]; then
+        echo "   Todavia no veo la pagina de login (el redirect tarda)."
+        echo "   Si ya estabas logueado y no deberia esperar: Ctrl+C."
+      else
+        echo "   ...sigo esperando (${waited}s). Ctrl+C para cancelar."
+      fi
+    fi
+  done
+}
+
+# Pide confirmacion Y/n (una tecla, sin Enter) y, si se acepta, abre la
+# ventana headed para el login (SSO + 2FA), espera a que se detecte el
+# login y reanuda el modo invisible. Si se rechaza, detiene y sale.
 #   $1 = cabecera del aviso
 #   $2 = texto del prompt (se le agrega " [Y/n] ")
 relogin_or_exit() {
@@ -200,7 +243,8 @@ relogin_or_exit() {
   echo ""
   echo "$header"
   echo -n "$ask [Y/n] "
-  read -r answer </dev/tty
+  read -n 1 -r answer </dev/tty
+  echo
   answer="$(echo "$answer" | tr '[:upper:]' '[:lower:]')"
   if [[ "$answer" == "y" || "$answer" == "" ]]; then
     echo "Deteniendo el navegador-dashboard y abriendo ventana de login..."
@@ -209,13 +253,8 @@ relogin_or_exit() {
     dash_boot true || { echo "ERROR: no se pudo abrir la ventana." >&2; exit 1; }
     echo ""
     echo "Logueate en el dashboard (SSO + 2FA)."
-    echo "Cuando termines, escribi 'done' y apreta Enter."
-    while true; do
-      echo -n "> "
-      read -r reply </dev/tty
-      [[ "$(echo "$reply" | tr '[:upper:]' '[:lower:]')" == "done" ]] && break
-      echo "Escribi 'done' cuando termines de loguearte."
-    done
+    echo "No necesitas avisarme: apenas termine el login, sigo solo."
+    wait_for_login
     echo "Reanudando ciclo invisible..."
     dash_stop
     sleep 2
@@ -284,7 +323,7 @@ dash_boot false || exit 1
 echo "Navegador-dashboard invisible arriba."
 
 # Espera de login en headless: primera vez, si pide sesion, ofrece abrir
-# la ventana para login (igual que en la expiracion) y espera 'done'.
+# la ventana para login (igual que en la expiracion) y detecta el login.
 sleep 3
 if dash_needs_auth; then
   relogin_or_exit \
