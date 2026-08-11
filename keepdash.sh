@@ -11,8 +11,11 @@
 #  IMPOSIBLE que Chrome aparezca, robe el foco o te corte el flujo.
 #
 #  PRIMERA VEZ (autenticacion SSO + 2FA):
-#    ./keepdash.sh --login   -> abre la VENTANA dedicada; te logueas UNA vez.
-#    ./keepdash.sh            -> de ahi en mas: cicla en headless (invisible).
+#    ./keepdash.sh            -> si no estas logueado, te pregunta si queres
+#                                abrir la ventana para login, espera 'done'
+#                                y reanuda el ciclo invisible. No hace falta
+#                                correr --login primero.
+#    ./keepdash.sh --login    -> abre la VENTANA dedicada manualmente.
 #
 #  Uso:
 #    ./keepdash.sh               -> ciclo en headless, invisible (240s default; URLs en config.conf).
@@ -29,8 +32,9 @@
 #    -u <file>  archivo con una URL por linea (pisa las de config.conf)
 #    -h         ayuda
 #
-#  Si la sesion expira (detectada por redirect a login), avisa y ofrece
-#  re-login automatico con Y/n.
+#  Si la sesion expira (detectada por redirect a login) o arrancas sin
+#  sesion, ofrece abrir el navegador para (re-)login con Y/n, espera la
+#  confirmacion ('done') y reanuda el ciclo invisible.
 # ============================================================
 
 set -u
@@ -186,6 +190,44 @@ dash_needs_auth() {
     | grep -qE 'login\.|okta'
 }
 
+# Pide confirmacion Y/n y, si se acepta, abre la ventana headed para el
+# login (SSO + 2FA), espera 'done' y reanuda el modo invisible. Si se
+# rechaza, detiene la instancia y sale.
+#   $1 = cabecera del aviso
+#   $2 = texto del prompt (se le agrega " [Y/n] ")
+relogin_or_exit() {
+  local header="$1" ask="$2"
+  echo ""
+  echo "$header"
+  echo -n "$ask [Y/n] "
+  read -r answer </dev/tty
+  answer="$(echo "$answer" | tr '[:upper:]' '[:lower:]')"
+  if [[ "$answer" == "y" || "$answer" == "" ]]; then
+    echo "Deteniendo el navegador-dashboard y abriendo ventana de login..."
+    dash_stop
+    sleep 2
+    dash_boot true || { echo "ERROR: no se pudo abrir la ventana." >&2; exit 1; }
+    echo ""
+    echo "Logueate en el dashboard (SSO + 2FA)."
+    echo "Cuando termines, escribi 'done' y apreta Enter."
+    while true; do
+      echo -n "> "
+      read -r reply </dev/tty
+      [[ "$(echo "$reply" | tr '[:upper:]' '[:lower:]')" == "done" ]] && break
+      echo "Escribi 'done' cuando termines de loguearte."
+    done
+    echo "Reanudando ciclo invisible..."
+    dash_stop
+    sleep 2
+    dash_boot false || { echo "ERROR: no se pudo reanudar el navegador." >&2; exit 1; }
+    echo "Ciclo invisible reanudado."
+  else
+    echo "Ok, corré  ./keepdash.sh --login  cuando quieras loguearte."
+    dash_stop
+    exit 1
+  fi
+}
+
 dash_refresh() {
   # Refresco por HTTP: cierra todas las pestanas y abre la siguiente URL.
   # En etapa: Chrome ni se entera (no activa ventanas, no roba foco).
@@ -241,15 +283,13 @@ fi
 dash_boot false || exit 1
 echo "Navegador-dashboard invisible arriba."
 
-# Espera de login en headless: si pide sesion, NO hay ventana que mostrar.
+# Espera de login en headless: primera vez, si pide sesion, ofrece abrir
+# la ventana para login (igual que en la expiracion) y espera 'done'.
 sleep 3
 if dash_needs_auth; then
-  echo ""
-  echo "El dashboard pide autenticacion (SSO + 2FA) pero el modo es invisible."
-  echo "Corre para autenticarte:  ./keepdash.sh --login"
-  echo "Luego volve a correr:     ./keepdash.sh"
-  dash_stop
-  exit 1
+  relogin_or_exit \
+    "El dashboard no esta autenticado (primera vez o sesion nueva)." \
+    "¿Abrir el navegador para login?"
 fi
 
 echo "Alternando invisible. Ciclo: ${INTERVAL}s, ${#URLS[@]} URL(s)."
@@ -271,35 +311,9 @@ while true; do
   fi
   # Chequeo de sesion expirada: redirect a login → ofrece re-login.
   if dash_needs_auth; then
-    echo ""
-    echo "La sesion expiro."
-    echo -n "¿Abrir el navegador para re-login? [Y/n] "
-    read -r answer </dev/tty
-    answer="$(echo "$answer" | tr '[:upper:]' '[:lower:]')"
-    if [[ "$answer" == "y" || "$answer" == "" ]]; then
-      echo "Deteniendo ciclo invisible y abriendo ventana de login..."
-      dash_stop
-      sleep 2
-      dash_boot true || { echo "ERROR: no se pudo abrir la ventana." >&2; exit 1; }
-      echo ""
-      echo "Logueate en el dashboard (SSO + 2FA)."
-      echo "Cuando termines, escribi 'done' y apreta Enter."
-      while true; do
-        echo -n "> "
-        read -r reply </dev/tty
-        [[ "$(echo "$reply" | tr '[:upper:]' '[:lower:]')" == "done" ]] && break
-        echo "Escribi 'done' cuando termines de loguearte."
-      done
-      echo "Reanudando ciclo invisible..."
-      dash_stop
-      sleep 2
-      dash_boot false || { echo "ERROR: no se pudo reanudar el navegador." >&2; exit 1; }
-      echo "Ciclo invisible reanudado."
-    else
-      echo "Ok, corré  ./keepdash.sh --login  cuando quieras re-loguearte."
-      dash_stop
-      exit 1
-    fi
+    relogin_or_exit \
+      "La sesion expiro." \
+      "¿Abrir el navegador para re-login?"
   fi
   url="${URLS[$((idx % ${#URLS[@]}))]}"
   ts="$(date '+%H:%M:%S')"
