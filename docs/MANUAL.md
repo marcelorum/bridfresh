@@ -9,7 +9,7 @@ dashboard that keeps your session alive by rotating URLS on a schedule.
   - [Contents](#contents)
   - [Requirements](#requirements)
   - [How it works](#how-it-works)
-  - [First time: login once](#first-time-login-once)
+  - [First time: log in when prompted](#first-time-log-in-when-prompted)
   - [Daily use — the invisible cycle](#daily-use--the-invisible-cycle)
   - [Command-line flags](#command-line-flags)
     - [Flag semantics](#flag-semantics)
@@ -19,7 +19,7 @@ dashboard that keeps your session alive by rotating URLS on a schedule.
   - [Session state](#session-state)
   - [Troubleshooting](#troubleshooting)
     - [The dashboard asks to log in again](#the-dashboard-asks-to-log-in-again)
-    - [Nothing happens / it exits saying the dashboard asks for auth](#nothing-happens--it-exits-saying-the-dashboard-asks-for-auth)
+    - [Nothing happens / the script asks about auth at startup](#nothing-happens--the-script-asks-about-auth-at-startup)
     - [The cycle feels too busy or too slow](#the-cycle-feels-too-busy-or-too-slow)
     - [I want to see what it's doing](#i-want-to-see-what-its-doing)
     - [I want to stop it](#i-want-to-stop-it)
@@ -31,7 +31,7 @@ dashboard that keeps your session alive by rotating URLS on a schedule.
 
 - macOS with Google Chrome installed (default path:
   `/Applications/Google Chrome.app`).
-- bash (the one shipped on macOS).
+- bash (the one shipped on macOS — no bash 4 features are required).
 - `curl` (preinstalled).
 - No other dependencies, nothing to install.
 
@@ -50,23 +50,33 @@ open a URL, close tabs, list open targets. It rotates between your URLs every
 The cycle runs in **`--headless=new`** mode. Chrome is invisible and never grabs
 focus, so it cannot interrupt your typing or steal the window.
 
-## First time: login once
+## First time: log in when prompted
 
-You authenticate **one time**, in a visible window:
+You don't need a separate login step — just start the cycle:
 
 ```bash
-./keepdash.sh --login
+./keepdash.sh
 ```
 
-1. A Chrome window opens on your first URL.
-2. Log in normally (SSO + 2FA).
-3. Close the window (or leave it) and run the daily command below.
+1. The script launches the dashboard **headless** (invisible).
+2. If you are not logged in yet (fresh profile or expired session), it prints:
 
-Your session is saved into `.dash-profile/` (cookies). It is reused by the
-headless cycle from then on. Shutting Chrome down or stopping the dashboard
-**does not** log you out.
+   ```text
+   El dashboard no esta autenticado (primera vez o sesion nueva).
+   ¿Abrir el navegador para login? [Y/n]
+   ```
 
-You only ever need `--login` again when the session expires.
+3. Press `Y` (or Enter): the script switches to a **visible** Chrome window.
+4. Log in normally (SSO + 2FA).
+5. When you finish, type `done` and press Enter — the script closes the visible
+   window and resumes the invisible cycle by itself.
+
+Your session is saved into `.dash-profile/` (cookies) and reused by the headless
+cycle from then on. Shutting Chrome down or stopping the dashboard **does not**
+log you out.
+
+`./keepdash.sh --login` still works if you prefer to open the visible window
+manually.
 
 ## Daily use — the invisible cycle
 
@@ -105,6 +115,14 @@ La sesion expiro.
   complete SSO + 2FA, then resumes the invisible cycle automatically.
 - **Anything else**: the cycle stops and tells you to run `./keepdash.sh --login`
   manually.
+
+The same prompt appears when you start the script without a session
+("El dashboard no esta autenticado (primera vez o sesion nueva)."), so a fresh
+setup needs no `--login` before the first run.
+
+> Note: the server assigns the session a fixed lifetime of roughly an hour.
+> Refreshing more often (a shorter `INTERVAL`) does not extend it; it only
+> changes how frequently the dashboards are visited.
 
 ## Command-line flags
 
@@ -201,23 +219,25 @@ interval; the `-u` and `-t` flags override them.
 The SSO session lives in `.dash-profile/` (gitignored, private). Because the
 headless cycle reuses the profile's cookies, you log in once and the session
 survives Chrome restarts and `--stop`/`--start` cycles. Deleting `.dash-profile/`
-logs you out — you would need to re-authenticate with `--login`.
+logs you out — the script will ask you to log in again on the next run.
 
 ## Troubleshooting
 
 ### The dashboard asks to log in again
 
-When the session expires, the cycle detects the login page and prompts you to
-re-login. Type `Y` to open the login window and resume automatically, or
-anything else to stop and run `./keepdash.sh --login` manually.
+When the session expires, the cycle detects the login page and prompts you with
+**Y/n**. Type `Y` (or Enter) to open the login window, complete SSO + 2FA, type
+`done`, and the cycle resumes automatically. Anything else stops the script.
 
-Run `./keepdash.sh --login`, log in again, then restart `./keepdash.sh`.
-
-### Nothing happens / it exits saying the dashboard asks for auth
-
-On a fresh profile the headless mode may land on a login page, with no visible
-window, and ask you to authenticate. Run `./keepdash.sh --login` once, then
+If you declined, run `./keepdash.sh --login`, log in again, then restart
 `./keepdash.sh`.
+
+### Nothing happens / the script asks about auth at startup
+
+On a fresh profile the headless mode may land on a login page. The script
+detects it and asks **Y/n** to open the login window: press `Y`, complete
+SSO + 2FA, type `done`, and the cycle resumes by itself. If you prefer a manual
+window, decline and run `./keepdash.sh --login`.
 
 ### The cycle feels too busy or too slow
 
@@ -257,8 +277,10 @@ focus, or interrupt typing. The only visible window is the one you open with
 `--login` or `--show`.
 
 **Q: Do I have to log in every time?**
-No. You authenticate once with `--login`; the headless cycle reuses that session
-indefinitely until it expires.
+No. On the first run the script asks you to open the login window; after that,
+the headless cycle reuses that session until it expires (roughly an hour). When
+it does, the script offers to open the login window again with the **Y/n**
+prompt.
 
 **Q: Will stopping the script log me out?**
 No. Shutting the dashboard down does not destroy the SSO session cookies.
