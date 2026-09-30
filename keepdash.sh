@@ -39,7 +39,16 @@
 # ============================================================
 
 set -u
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Resuelve symlinks (ej. ~/bin/keepdash -> bridfresh/keepdash.sh) para que
+# SCRIPT_DIR siempre apunte al repo real, sin importar desde donde se invoque.
+_SRC="${BASH_SOURCE[0]}"
+while [[ -L "$_SRC" ]]; do
+  _d="$(cd -P "$(dirname "$_SRC")" >/dev/null 2>&1 && pwd)"
+  _t="$(readlink "$_SRC")"
+  [[ "$_t" != /* ]] && _t="$_d/$_t"
+  _SRC="$_t"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$_SRC")" && pwd)"
 CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 PROFILE_DIR="$SCRIPT_DIR/.dash-profile"      # perfil dedicado (privado, gitignored)
 PORT=9222                                     # puerto local de control (CDP)
