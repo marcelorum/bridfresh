@@ -1,6 +1,6 @@
 # Review Follow-ups — keepdash.sh
 
-Recorded after the bounded 4R review of commit `44ae777` (feat: dedicated invisible browser keepalive for Kyndryl dashboard). All findings are non-blocking (WARNING / SUGGESTION) and remain open.
+Recorded after the bounded 4R review of commit `44ae777` (feat: dedicated invisible browser keepalive for dashboard). All findings are non-blocking (WARNING / SUGGESTION) and remain open.
 
 Review context: lineage `review-be3c10b139f9a019`, target `sha256:be3c10b139f9a019...`, risk HIGH → full 4R set. Verdict per lens: CLEAR.
 
@@ -52,7 +52,7 @@ Review context: lineage `review-be3c10b139f9a019`, target `sha256:be3c10b139f9a0
 - **Lens:** review-reliability (R3)
 - **Severity:** WARNING
 - **Location:** `keepdash.sh:251-258`
-- **Claim:** Right after `/json/new`, Chrome lists the tab with the requested dashboard URL, and the redirect to `login.kyndryl.com` happens asynchronously afterward. The immediate `dash_needs_auth` therefore always returns "no auth", so expiry is only actually detected at the start of the next loop iteration — up to one `INTERVAL` of latency.
+- **Claim:** Right after `/json/new`, Chrome lists the tab with the requested dashboard URL, and the redirect to the login page happens asynchronously afterward. The immediate `dash_needs_auth` therefore always returns "no auth", so expiry is only actually detected at the start of the next loop iteration — up to one `INTERVAL` of latency.
 - **Proof refs:** `keepdash.sh:172-184`, `keepdash.sh:253` (immediate check), `keepdash.sh:241` (loop-start check after `sleep 260`).
 - **Possible fix:** re-check after a short delay, or poll the CDP target's effective URL a few times.
 
