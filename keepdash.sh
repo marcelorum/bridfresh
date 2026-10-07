@@ -11,11 +11,11 @@
 #  IMPOSIBLE que Chrome aparezca, robe el foco o te corte el flujo.
 #
 #  PRIMERA VEZ (autenticacion SSO + 2FA):
-#    ./keepdash.sh            -> si no estas logueado, te pregunta si queres
-#                                abrir la ventana para login (una tecla, sin
-#                                Enter), espera y DETECTA SOLO cuando terminas
-#                                de loguearte, y reanuda el ciclo invisible.
-#                                No hace falta correr --login primero.
+#    ./keepdash.sh            -> si no estas logueado, abre SOLA la ventana
+#                                para login, espera y DETECTA SOLO cuando
+#                                terminas de loguearte, y reanuda el ciclo
+#                                invisible. Sin preguntas, sin --login previo.
+#                                La segunda vez entra directo al ciclo.
 #    ./keepdash.sh --login    -> abre la VENTANA dedicada manualmente.
 #
 #  Uso:
@@ -33,9 +33,9 @@
 #    -u <file>  archivo con una URL por linea (pisa las de config.conf)
 #    -h         ayuda
 #
-#  Si la sesion expira (detectada por redirect a login) o arrancas sin
-#  sesion, ofrece abrir el navegador para (re-)login con Y/n (una tecla),
-#  detecta solo el login y reanuda el ciclo invisible.
+#  Si arrancas sin sesion, abre SOLA la ventana de login y reanuda el
+#  ciclo invisible al detectar el login. Si la sesion expira a mitad del
+#  ciclo, imprime un resumen y cierra solo (sin preguntar).
 # ============================================================
 
 set -u
@@ -242,38 +242,52 @@ wait_for_login() {
   done
 }
 
-# Pide confirmacion Y/n (una tecla, sin Enter) y, si se acepta, abre la
-# ventana headed para el login (SSO + 2FA), espera a que se detecte el
-# login y reanuda el modo invisible. Si se rechaza, detiene y sale.
-#   $1 = cabecera del aviso
-#   $2 = texto del prompt (se le agrega " [Y/n] ")
-relogin_or_exit() {
-  local header="$1" ask="$2"
+# Resumen de cierre: motivo, inicio, fin, duracion y refrescos. Se usa
+# en todos los cierres (tiempo cumplido, sesion expirada, Ctrl+C).
+print_summary() {
+  local reason="$1"
+  local end_ts now_str elapsed mins secs
+  end_ts="$(date +%s)"
+  now_str="$(date '+%H:%M:%S')"
+  elapsed=$((end_ts - ${START_TS:-$end_ts}))
+  mins=$((elapsed / 60)); secs=$((elapsed % 60))
   echo ""
-  echo "$header"
-  echo -n "$ask [Y/n] "
-  read -n 1 -r answer </dev/tty
-  echo
-  answer="$(echo "$answer" | tr '[:upper:]' '[:lower:]')"
-  if [[ "$answer" == "y" || "$answer" == "" ]]; then
-    echo "Deteniendo el navegador-dashboard y abriendo ventana de login..."
-    dash_stop
-    sleep 2
-    dash_boot true || { echo "ERROR: no se pudo abrir la ventana." >&2; exit 1; }
-    echo ""
-    echo "Logueate en el dashboard (SSO + 2FA)."
-    echo "No necesitas avisarme: apenas termine el login, sigo solo."
-    wait_for_login
-    echo "Reanudando ciclo invisible..."
-    dash_stop
-    sleep 2
-    dash_boot false || { echo "ERROR: no se pudo reanudar el navegador." >&2; exit 1; }
-    echo "Ciclo invisible reanudado."
-  else
-    echo "Ok, corré  ./keepdash.sh --login  cuando quieras loguearte."
-    dash_stop
-    exit 1
-  fi
+  echo "--- Resumen ---"
+  echo "  Motivo:     $reason"
+  echo "  Inicio:     ${START_STR:-$now_str}"
+  echo "  Fin:        $now_str"
+  echo "  Duracion:   ${mins}m ${secs}s"
+  echo "  Refrescos:  ${idx:-0} (${#URLS[@]} URL(s) cada ${INTERVAL}s)"
+}
+
+# Arranque sin sesion: abre SOLA la ventana de login (sin preguntar),
+# espera a que se detecte el login y reanuda el ciclo invisible.
+auto_login_from_startup() {
+  echo ""
+  echo "El dashboard no esta autenticado (primera vez o sesion nueva)."
+  echo "Abriendo la ventana para login..."
+  dash_stop
+  sleep 2
+  dash_boot true || { echo "ERROR: no se pudo abrir la ventana." >&2; exit 1; }
+  echo ""
+  echo "Logueate en el dashboard (SSO + 2FA)."
+  echo "No necesitas avisarme: apenas termine el login, sigo solo."
+  wait_for_login
+  echo "Reanudando ciclo invisible..."
+  dash_stop
+  sleep 2
+  dash_boot false || { echo "ERROR: no se pudo reanudar el navegador." >&2; exit 1; }
+  echo "Ciclo invisible reanudado."
+}
+
+# Sesion expirada a mitad de ciclo: resumen y cierre directo (sin preguntar).
+expiry_close() {
+  echo ""
+  echo "La sesion expiro."
+  print_summary "sesion expirada"
+  dash_stop
+  echo "Adios."
+  exit 0
 }
 
 dash_refresh() {
@@ -331,13 +345,12 @@ fi
 dash_boot false || exit 1
 echo "Navegador-dashboard invisible arriba."
 
-# Espera de login en headless: primera vez, si pide sesion, ofrece abrir
-# la ventana para login (igual que en la expiracion) y detecta el login.
+# Espera de login en headless: primera vez, si pide sesion, abre SOLA
+# la ventana de login y reanuda el ciclo al detectarlo. La segunda vez
+# (sesion guardada en .dash-profile/) entra directo al ciclo.
 sleep 3
 if dash_needs_auth; then
-  relogin_or_exit \
-    "El dashboard no esta autenticado (primera vez o sesion nueva)." \
-    "¿Abrir el navegador para login?"
+  auto_login_from_startup
 fi
 
 echo "Alternando invisible. Ciclo: ${INTERVAL}s, ${#URLS[@]} URL(s)."
@@ -346,22 +359,21 @@ echo "Para detener:      ./keepdash.sh --stop"
 echo "Para ver/login:    ./keepdash.sh --login"
 echo "---"
 
-trap 'echo; echo "Detenido."; dash_stop; echo "Adios."; exit 0' INT
+trap 'print_summary "interrumpido (Ctrl+C)"; dash_stop; echo "Adios."; exit 0' INT
 START_TS="$(date +%s)"
+START_STR="$(date '+%H:%M:%S')"
 idx=0
 while true; do
-  # Chequeo de duracion: si se cumplio el tiempo, salgo limpio.
+  # Chequeo de duracion: si se cumplio el tiempo, resumen y cierre directo.
   if [[ "$DURATION_MINS" -gt 0 ]] && (( $(date +%s) - START_TS >= DURATION_MINS * 60 )); then
-    echo ""
-    echo "Tiempo cumplido (${DURATION_MINS} min). Apagando el navegador-dashboard."
+    print_summary "tiempo cumplido (${DURATION_MINS} min)"
     dash_stop
+    echo "Adios."
     exit 0
   fi
-  # Chequeo de sesion expirada: redirect a login → ofrece re-login.
+  # Chequeo de sesion expirada: redirect a login → resumen y cierre directo.
   if dash_needs_auth; then
-    relogin_or_exit \
-      "La sesion expiro." \
-      "¿Abrir el navegador para re-login?"
+    expiry_close
   fi
   url="${URLS[$((idx % ${#URLS[@]}))]}"
   ts="$(date '+%H:%M:%S')"
