@@ -57,7 +57,7 @@ DURATION_MINS=0                               # 0 = sin limite (corre hasta --st
 
 # URL por default si no hay URLS en config.conf ni -u <archivo>.
 DEFAULT_URLS=(
-  "https://www.kyndryl.com/bridge/aiops/home"
+  "https://example.com/dashboard"
 )
 
 # --- CONFIG (si existe): tomamos INTERVAL y URLS=( ... ) como default ---
@@ -195,7 +195,7 @@ dash_stop() {
 }
 
 dash_needs_auth() {
-  # ¿Alguna pestana quedo en la pagina de login (login.kyndryl.com / okta)?
+  # ¿Alguna pestana quedo en la pagina de login (login. / okta)?
   curl -s --max-time 5 "http://localhost:$PORT/json/list" 2>/dev/null \
     | grep -qE 'login\.|okta'
 }
